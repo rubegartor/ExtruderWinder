@@ -67,7 +67,7 @@ AccelStepper alignerMotor(AccelStepper::DRIVER, ALIGNER_STEP_PIN, ALIGNER_DIR_PI
 
 VL53L0X lox;
 
-BlockNot readDistance(500);
+BlockNot readDistance(200);
 
 enum MotorDirEnum {
   forward,
@@ -130,7 +130,12 @@ void initMenu(MenuOption option = toggleSpool) {
   lcd.write(byte(0));
 
   lcd.setCursor(1, 0);
-  lcd.print("On/Off");
+
+  if (globalData.spool) {
+    lcd.print("On/Off [On] ");
+  } else {
+    lcd.print("On/Off [Off]");
+  }
 
   lcd.setCursor(1, 1);
   lcd.print("Resumen");
@@ -336,6 +341,13 @@ void aligner(void* pvParameters) {
         // Aquí podría comprobar si el resultado de `globalData.totalRevs` se ha actualizado desde el ultimo ciclo para ahorrar tiempo al MCU
         lcd.setCursor(0, 0);
         lcd.print("Revs: " + (String)globalData.totalRevs);
+
+        lcd.setCursor(0, 2);
+
+        char actualDistanceBuffer[30];
+        sprintf(actualDistanceBuffer, "Tensioner: %-3d", globalData.actualDistance);
+
+        lcd.print(actualDistanceBuffer);
       }
 
       if (rotaryEncoder.encoderChanged()) {
@@ -373,9 +385,9 @@ void aligner(void* pvParameters) {
 
             lcd.setCursor(0, 0);
 
-            char spoolSpeedBuffer[40] = "";
+            char spoolSpeedBuffer[30] = "";
 
-            sprintf(spoolSpeedBuffer, "Velocidad: %05d", tempSpoolSpeed);
+            sprintf(spoolSpeedBuffer, "Velocidad: %-5d", tempSpoolSpeed);
             lcd.print(spoolSpeedBuffer);
 
             globalData.spoolSpeed = tempSpoolSpeed;
@@ -391,6 +403,7 @@ void aligner(void* pvParameters) {
       if (rotaryEncoder.isEncoderButtonClicked()) {
         if (globalData.selectedOption == toggleSpool) {
           globalData.spool = !globalData.spool;
+          initMenu(toggleSpool);
         }
 
         if (globalData.selectedOption == viewInfo) {
