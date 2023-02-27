@@ -1,6 +1,6 @@
 #include <TMCStepper.h>
 #include <AccelStepper.h>
-#include "Adafruit_VL53L0X.h"
+#include <VL53L0X.h>
 #include "soc/timer_group_struct.h"
 #include "soc/timer_group_reg.h"
 #include "AiEsp32RotaryEncoder.h"
@@ -41,7 +41,7 @@ const uint16_t oneRev = 3200 * spoolMotorRatio;  // Steps for 1 revolution at  m
 const float filamentDiameter = 0.175;            // 1.75mm
 
 // Tensioner consts
-const uint16_t minDistance = 60;
+const uint16_t minDistance = 80;
 const uint16_t offsetDistance = 100;
 
 byte arrow[] = {
@@ -65,9 +65,9 @@ AccelStepper spoolMotor(AccelStepper::DRIVER, SPOOL_STEP_PIN, SPOOL_DIR_PIN);
 AccelStepper alignerMotor(AccelStepper::DRIVER, ALIGNER_STEP_PIN, ALIGNER_DIR_PIN);
 
 
-Adafruit_VL53L0X lox = Adafruit_VL53L0X();
+VL53L0X lox;
 
-BlockNot readDistance(200);
+BlockNot readDistance(500);
 
 enum MotorDirEnum {
   forward,
@@ -153,7 +153,6 @@ void setup() {
 
   delay(1000);
 
-  Wire.begin();
   SPI.begin();
 
   pinMode(MISO, INPUT_PULLUP);
@@ -195,19 +194,27 @@ void setup() {
 
   delay(1500);
 
-  if (!lox.begin(LOX_ADDRESS)) {
-    Serial.println(F("Failed to boot VL53L0X"));
-    ESP.restart();
-  }
+  Wire.begin();
 
-  Serial.println("Starting rotary encoder");
+  if (!lox.init()) {
+    Serial.println(F("Failed to boot VL53L0X!"));
+
+    lcd.setCursor(0, 0);
+    lcd.print("Failed to boot VL53L0X!");
+
+    while (1);
+  }
+  
+  lox.setTimeout(250);
+
+  Serial.println(F("Starting rotary encoder"));
 
   rotaryEncoder.begin();
   rotaryEncoder.setup(readEncoderISR);
   rotaryEncoder.setBoundaries(-10000000, 10000000, false);  //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
   rotaryEncoder.setAcceleration(RORATY_ENCODER_ACCELERATION);
 
-  Serial.println("Starting tasks");
+  Serial.println(F("Starting tasks"));
 
   pinMode(ALIGNER_HOME_SENSOR_PIN, INPUT_PULLUP);
 
@@ -223,7 +230,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     aligner,            /* Task function. */
     "Aligner",          /* name of task. */
-    10000,              /* Stack size of task */
+    80000,              /* Stack size of task */
     (void*)&globalData, /* parameter of the task */
     10,                 /* priority of the task */
     &alignerTask,       /* Task handle to keep track of created task */
@@ -402,6 +409,8 @@ void aligner(void* pvParameters) {
             lcd.print("Revs: " + (String)globalData.totalRevs);
             lcd.setCursor(0, 1);
             lcd.print("Speed: " + (String)globalData.spoolSpeed);
+            lcd.setCursor(0, 2);
+            lcd.print("Tensioner: " + (String)globalData.actualDistance);
 
             isResume = true;
             isInSubmenu = true;
@@ -528,10 +537,7 @@ void aligner(void* pvParameters) {
 }
 
 IRAM_ATTR uint16_t getDistance() {
-  VL53L0X_RangingMeasurementData_t measure;
-  lox.rangingTest(&measure);
-
-  return measure.RangeMilliMeter;
+  return lox.readRangeSingleMillimeters();
 }
 
 void loop() {}
