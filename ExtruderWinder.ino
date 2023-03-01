@@ -4,6 +4,8 @@
 #include "soc/timer_group_struct.h"
 #include "soc/timer_group_reg.h"
 #include "AiEsp32RotaryEncoder.h"
+#include <WiFi.h>
+#include <esp_now.h>
 #include <LiquidCrystal_I2C.h>
 #include <BlockNot.h>
 #include <Wire.h>
@@ -33,6 +35,12 @@
 #define LOX_ADDRESS 0x30
 #define SHT_LOX 13
 
+typedef struct puller_message {
+  uint16_t revs;
+  uint32_t speed;
+} puller_message;
+
+puller_message pullerMessage;
 
 // Aligner and Spooler consts
 const float spoolMotorRatio = 5.18;
@@ -95,6 +103,17 @@ struct gData {
 
 gData globalData;
 
+typedef struct winder_message {
+  uint16_t spoolSpeed;
+} winder_message;
+
+winder_message winderMessage;
+
+esp_now_peer_info_t peerInfo;
+
+//C8:F0:9E:A2:91:F8
+uint8_t broadcastAddress[] = {0xC8, 0xF0, 0x9E, 0xA2, 0x91, 0xF8};
+
 TaskHandle_t winderTask;
 TaskHandle_t alignerTask;
 
@@ -145,7 +164,7 @@ void initMenu(MenuOption option = toggleSpool) {
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   while (!Serial)
     ;
   Serial.println("Starting...");
@@ -155,8 +174,6 @@ void setup() {
 
   pinMode(ALIGNER_CS_PIN, OUTPUT);
   digitalWrite(ALIGNER_CS_PIN, HIGH);
-
-  delay(1000);
 
   SPI.begin();
 
@@ -186,8 +203,6 @@ void setup() {
   pinMode(ALIGNER_STEP_PIN, OUTPUT);
 
   digitalWrite(ALIGNER_DIR_PIN, LOW);
-
-  delay(1000);
 
   lcd.init();
   lcd.createChar(0, arrow);
@@ -223,6 +238,31 @@ void setup() {
 
   pinMode(ALIGNER_HOME_SENSOR_PIN, INPUT_PULLUP);
 
+  WiFi.mode(WIFI_STA);
+
+  delay(500);
+
+  if (esp_now_init() != ESP_OK) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("Error initializing ESP-Now"));
+
+    while(1);
+  }
+
+  esp_now_register_recv_cb(OnDataRecv);
+  
+  esp_now_peer_info_t slaveInfo;
+  memset(&slaveInfo, 0, sizeof(slaveInfo));
+  memcpy(slaveInfo.peer_addr, broadcastAddress, 6);
+  slaveInfo.channel = 0;
+  slaveInfo.encrypt = false;
+
+  // Add slave
+  if (esp_now_add_peer(&slaveInfo) != ESP_OK) {
+    return;
+  }
+
   xTaskCreatePinnedToCore(
     winder,             /* Task function. */
     "Winder",           /* name of task. */
@@ -240,6 +280,17 @@ void setup() {
     10,                 /* priority of the task */
     &alignerTask,       /* Task handle to keep track of created task */
     1);                 /* pin task to core 1 */
+}
+
+void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+  memcpy(&pullerMessage, incomingData, sizeof(pullerMessage));
+  Serial.print("Bytes received: ");
+  Serial.println(len);
+  Serial.print("Puller Speed: ");
+  Serial.println(pullerMessage.speed);
+  Serial.print("Puller revs: ");
+  Serial.println(pullerMessage.revs);
+  Serial.println();
 }
 
 void winder(void* pvParameters) {
@@ -391,6 +442,9 @@ void aligner(void* pvParameters) {
             lcd.print(spoolSpeedBuffer);
 
             globalData.spoolSpeed = tempSpoolSpeed;
+
+            winderMessage.spoolSpeed = globalData.spoolSpeed;
+            esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &winderMessage, sizeof(winderMessage));
           } else if (!isInSubmenu) {
             initMenu(setSpeed);
             globalData.selectedOption = setSpeed;
@@ -424,6 +478,8 @@ void aligner(void* pvParameters) {
             lcd.print("Speed: " + (String)globalData.spoolSpeed);
             lcd.setCursor(0, 2);
             lcd.print("Tensioner: " + (String)globalData.actualDistance);
+            lcd.setCursor(0, 3);
+            lcd.print((String)WiFi.macAddress());
 
             isResume = true;
             isInSubmenu = true;
