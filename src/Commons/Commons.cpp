@@ -1,29 +1,33 @@
-#include <Arduino.h>
-#include "soc/timer_group_struct.h"
-#include "soc/timer_group_reg.h"
-#include <Commons/Commons.h>
 #include <AiEsp32RotaryEncoder.h>
-#include <Connection/Connection.h>
+#include <Arduino.h>
+#include <Commons/Commons.h>
 #include <LCD/LCDMenu.h>
-#include <Tensioner/Tensioner.h>
 #include <RotaryEncoder/RotaryEncoder.h>
+#include <Tensioner/Tensioner.h>
+#include <Calibration/Calibration.h>
 
-ESPNowConnection espnow = ESPNowConnection();
+#include "soc/timer_group_reg.h"
+#include "soc/timer_group_struct.h"
+
 LCDMenu lcdMenu = LCDMenu();
 Tensioner tensioner = Tensioner();
 REncoder rotaryEncoder = REncoder();
+Calibration calibration = Calibration();
 
 bool homed;
-bool canLCD;
-bool spool = true;
-int selectedOption;
-uint16_t totalRevs;
+bool needHome;
+bool firstSync;
+bool pullerState = true;
 uint16_t actualDistance;
-uint16_t spoolSpeed = 2000;
+uint16_t spoolTotalRevs;
+uint16_t pullerTotalRevs;
+uint16_t spoolSpeed = pullerSpeed * speedRatioMultiplier;
+uint16_t pullerSpeed = 1500;
 
-IRAM_ATTR void watchDogFeed()
-{
-    TIMERG0.wdt_wprotect = TIMG_WDT_WKEY_VALUE;
-    TIMERG0.wdt_feed = 1;
-    TIMERG0.wdt_wprotect = 0;
+bool isReady() { return homed && !needHome; }
+
+void IRAM_ATTR watchDogFeed() {
+  TIMERG0.wdt_wprotect = TIMG_WDT_WKEY_VALUE;
+  TIMERG0.wdt_feed = 1;
+  TIMERG0.wdt_wprotect = 0;
 }

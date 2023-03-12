@@ -2,10 +2,9 @@
 
 #include <Arduino.h>
 
-class Tensioner
-{
-public:
-    void init();
+class Tensioner {
+ public:
+  void init();
 
-    IRAM_ATTR uint16_t getDistance();
+  uint16_t IRAM_ATTR getDistance();
 };

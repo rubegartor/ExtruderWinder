@@ -9,4 +9,4 @@
 #define ALIGNER_FIRST_MOVE -300
 #define ALIGNER_MAX_SPEED 10000
 
-void aligner(void* pvParameters);
+void aTask(void* pvParameters);

@@ -1,36 +1,66 @@
-#include <Winder/Winder.h>
 #include <AccelStepper.h>
 #include <Commons/Commons.h>
+#include <Winder/Winder.h>
+#include <mat.h>
 
 AccelStepper spoolMotor(AccelStepper::DRIVER, SPOOL_STEP_PIN, SPOOL_DIR_PIN);
+AccelStepper pullerMotor(AccelStepper::DRIVER, PULLER_STEP_PIN, PULLER_DIR_PIN);
 
-void winder(void* pvParameters) {
-  spoolMotor.setMaxSpeed(SPOOL_MAX_SPEED);
+bool run;
+bool minTriggered;
 
-  bool run = true;
-  bool minTriggered = false;
+void initWinder() { spoolMotor.setMaxSpeed(SPOOL_MAX_SPEED); }
+
+void IRAM_ATTR winderLoop() {
+  if (actualDistance <= MIN_DISTANCE) {
+    minTriggered = true;
+    run = false;
+  }
+
+  if (minTriggered && (actualDistance - OFFSET_DISTANCE) > 60) {
+    run = true;
+    minTriggered = false;
+  }
+
+  if (homed && run && pullerState) {
+    spoolMotor.setSpeed(spoolSpeed);
+    spoolMotor.runSpeed();
+
+    if (spoolMotor.currentPosition() >= oneRevSpool) {
+      spoolTotalRevs++;
+      spoolMotor.setCurrentPosition(0);
+    }
+  }
+}
+
+void initPuller() { pullerMotor.setMaxSpeed(PULLER_MAX_SPEED); }
+
+void IRAM_ATTR pullerLoop() {
+  if (pullerState) {
+    pullerMotor.setSpeed(pullerSpeed);
+    pullerMotor.runSpeed();
+  }
+
+  if (pullerMotor.currentPosition() >= oneRevPuller) {
+    pullerTotalRevs++;
+    pullerMotor.setCurrentPosition(0);
+  }
+}
+
+void IRAM_ATTR wTask(void* pvParameters) {
+  initWinder();
+  initPuller();
 
   for (;;) {
-    if (actualDistance <= minDistance) {
-      minTriggered = true;
-      run = false;
-    }
-
-    if (minTriggered && (actualDistance - offsetDistance) > 60) {
-      run = true;
-      minTriggered = false;
-    }
-
-    if (homed && run && spool) {
-      spoolMotor.setSpeed(spoolSpeed);
-      spoolMotor.runSpeed();
-
-      if (spoolMotor.currentPosition() >= oneRev) {
-        totalRevs += 1;
-        spoolMotor.setCurrentPosition(0);
-      }
-    }
+    pullerLoop();
+    winderLoop();
 
     watchDogFeed();
   }
+}
+
+float getExtrudedLength() {
+  float circ = PI * ((float)PULLER_DIAM / (float)1000);
+
+  return circ * (float)pullerTotalRevs;
 }

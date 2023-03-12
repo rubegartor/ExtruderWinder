@@ -1,40 +1,39 @@
 #pragma once
 
+#include <AiEsp32RotaryEncoder.h>
 #include <Arduino.h>
-
-#include <Connection/Connection.h>
+#include <Commons/Commons.h>
 #include <LCD/LCDMenu.h>
-#include <Tensioner/Tensioner.h>
 #include <RotaryEncoder/RotaryEncoder.h>
+#include <Tensioner/Tensioner.h>
+#include <Calibration/Calibration.h>
 
-#define ROTARY_ENCODER_A_PIN 27       // DT
-#define ROTARY_ENCODER_B_PIN 26       // CLK
-#define ROTARY_ENCODER_BUTTON_PIN 35  // SW
-#define ROTARY_ENCODER_STEPS 4
-#define ROTARY_ENCODER_VCC_PIN -1
-#define RORATY_ENCODER_ACCELERATION 120
+#include "soc/timer_group_reg.h"
+#include "soc/timer_group_struct.h"
 
 const float spoolMotorRatio = 5.18;
-const uint16_t stepsPerCm = 476;                 // Steps to travel 1cm
-const uint16_t oneRev = 3200 * spoolMotorRatio;  // Steps for 1 revolution at  microsteps
-const float filamentDiameter = 0.175;            // 1.75mm
+const uint16_t stepsPerCm = 476;  // Steps to travel 1cm
+const float speedRatioMultiplier = 1.25; // Speed ratio between spool speed and puller speed
+const uint16_t oneRevSpool = 3200 * spoolMotorRatio;
+const uint16_t oneRevPuller = 3200;
+const float filamentDiameter = 1.75;
 
-const uint16_t minDistance = 55;
-const uint16_t offsetDistance = 100;
-
-extern ESPNowConnection espnow;
+extern Calibration calibration;
 extern LCDMenu lcdMenu;
 extern Tensioner tensioner;
 extern REncoder rotaryEncoder;
 
 // Global variables
 extern bool homed;
-extern bool canLCD;
-extern bool spool;
-extern int selectedOption;
-extern uint16_t totalRevs;
+extern bool needHome;
+extern bool firstSync;
+extern bool pullerState;
 extern uint16_t actualDistance;
+extern uint16_t spoolTotalRevs;
+extern uint16_t pullerTotalRevs;
 extern uint16_t spoolSpeed;
+extern uint16_t pullerSpeed;
 
+bool isReady();
 
-IRAM_ATTR void watchDogFeed();
+void IRAM_ATTR watchDogFeed();

@@ -2,14 +2,24 @@
 
 #include <Arduino.h>
 
-class REncoder
-{
-public:
-    void init();
+#define ROTARY_ENCODER_A_PIN 27       // DT
+#define ROTARY_ENCODER_B_PIN 26       // CLK
+#define ROTARY_ENCODER_BUTTON_PIN 35  // SW
+#define ROTARY_ENCODER_STEPS 4
+#define ROTARY_ENCODER_VCC_PIN -1
+#define RORATY_ENCODER_ACCELERATION 120
 
-    long value();
+enum RotaryDirection { decreased, increased };
 
-    bool clicked();
+class REncoder {
+ public:
+  long lastReadValue;
 
-    bool changed();
+  RotaryDirection direction;
+
+  void init();
+
+  bool clicked();
+
+  bool changed();
 };
