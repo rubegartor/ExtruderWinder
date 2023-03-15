@@ -12,11 +12,12 @@ AccelStepper alignerMotor(AccelStepper::DRIVER, ALIGNER_STEP_PIN,
 
 BlockNot readDistance(200);
 BlockNot updateSummary(500);
+BlockNot readCalibration(80);
 
+bool homingAligner = false;
 bool firstMove = false;
 uint16_t lastTotalRevs = 0;
 
-bool isHomingAligner = false;
 bool isStartPosSet = false;
 bool isEndPosSet = false;
 int16_t spoolEndPos = 0;
@@ -33,7 +34,7 @@ bool goToHome() {
   return homeSensor;
 }
 
-void onRotaryEncoderChange() {
+int16_t moveStep() {
   int steps = stepsPerCm * (filamentDiameter / 10);
 
   if (rotaryEncoder.direction == increased) {
@@ -43,6 +44,8 @@ void onRotaryEncoderChange() {
   alignerMotor.setAcceleration(20000);
   alignerMotor.setSpeed(200);
   alignerMotor.runToNewPosition(alignerMotor.currentPosition() + steps);
+
+  return alignerMotor.currentPosition();
 }
 
 void moveAligner() {
@@ -90,13 +93,15 @@ void aTask(void *pvParameters) {
       firstMove = true;
     }
 
-    calibration.read();
+    if (readCalibration.TRIGGERED) {
+      calibration.read();
+    }
 
     if (updateSummary.TRIGGERED) {
       refreshSummary();
     }
 
-    if (needHome && !isHomingAligner) {
+    if (needHome && !homingAligner) {
       alignerMotor.setSpeed(1500);
       homed = goToHome();
       needHome = !homed;
@@ -108,14 +113,14 @@ void aTask(void *pvParameters) {
         isStartPosSet = false;
         isEndPosSet = false;
         spoolEndPos = 0;
-        isHomingAligner = true;
+        homingAligner = true;
       }
     }
 
-    if (!needHome && homed && isHomingAligner) {
+    if (!needHome && homed && homingAligner) {
       if (!isStartPosSet) {
         if (rotaryEncoder.changed()) {
-          onRotaryEncoderChange();
+          moveStep();
         }
 
         if (rotaryEncoder.clicked()) {
@@ -129,7 +134,7 @@ void aTask(void *pvParameters) {
 
       if (isStartPosSet && !isEndPosSet) {
         if (rotaryEncoder.changed()) {
-          onRotaryEncoderChange();
+          moveStep();
         }
 
         if (rotaryEncoder.clicked()) {
@@ -137,17 +142,16 @@ void aTask(void *pvParameters) {
           spoolEndPos = alignerMotor.currentPosition();
 
           alignerMotor.setSpeed(1000);
-          alignerMotor.moveTo(0);
-          alignerMotor.runToPosition();
+          alignerMotor.runToNewPosition(0);
 
-          isHomingAligner = false;
+          homingAligner = false;
 
           lcdMenu.initSummary(true);
         }
       }
     }
 
-    if (!isHomingAligner) {
+    if (!homingAligner) {
       // Cuando se haya completado una revolución de la bobina se debe mover el
       // alineador
       if (spoolTotalRevs != lastTotalRevs) {

@@ -39,7 +39,7 @@ void setup() {
   driverAligner.begin();           // Initiate pins and registers
   driverAligner.toff(4);           // off time
   driverAligner.blank_time(24);    // blank time
-  driverAligner.rms_current(400);  // 600mAh RMS
+  driverAligner.rms_current(550);  // 550mAh RMS
   driverAligner.microsteps(2);     // 2 microsteps
 
   driverSpool.begin();              // Initiate pins and registers

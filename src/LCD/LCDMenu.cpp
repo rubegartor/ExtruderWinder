@@ -27,7 +27,7 @@ byte backCharacter[] = {B00100, B01110, B11111, B00100,
 
 // Implementar una función para autocompletar con espacios el buffer
 const char *optionsStr[MENU_OPTIONS_NUMBER] = {
-    "Resumen            ", "Posicionar         ", "Velocidad puller   ",
+    "Resumen            ", "Velocidad puller  ",  "Posicionar         ",
     "On/Off puller      ", "Alarmas            ", "Reset contadores   "};
 
 const int speeds[4] = {5, 10, 100, 500};
@@ -103,8 +103,9 @@ void LCDMenu::initSummary(bool clear) {
   lcd.setCursor(0, 1);
   lcd.print("D");
   lcd.setCursor(2, 1);
-  lcd.print(" " + (String)calibration.minRead + "/" + (String)calibration.lastRead +
-            "/" + (String)calibration.maxRead + "  ");
+  lcd.print(" " + (String)calibration.minRead + "/" +
+            (String)calibration.lastRead + "/" + (String)calibration.maxRead +
+            "  ");
 }
 
 void LCDMenu::initMenu(MenuOption option, bool clear) {
@@ -116,7 +117,7 @@ void LCDMenu::initMenu(MenuOption option, bool clear) {
     row = MENU_MAX_OPTIONS_SHOWED - 1;
   }
 
-  for (uint8_t i = 0; i < MENU_OPTIONS_NUMBER; i++) {
+  for (uint8_t i = 0; i < MENU_MAX_OPTIONS_SHOWED; i++) {
     lcd.setCursor(0, i);
     lcd.print(" ");
   }
@@ -359,9 +360,10 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
   }
 
   if (this->inSubMenu) {
-    this->inSubMenu = false;
     this->measuringSubMenuOption = 0;
     this->selectedMeasuringOption = returnOption;
+    // -----------------------------------------------------------
+    this->inSubMenu = false;
     this->initMenu((MenuOption)this->menuPosition, true);
 
     return;

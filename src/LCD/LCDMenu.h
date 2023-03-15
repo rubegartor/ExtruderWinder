@@ -12,8 +12,8 @@
 
 enum MenuOption {
   summaryOption,
-  homeAlignerOption,
   pullerSpeedOption,
+  homeAlignerOption,
   togglePullerOption,
   measuringOption,
   resetCountersOption

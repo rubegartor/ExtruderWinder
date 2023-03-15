@@ -10,3 +10,5 @@
 #define ALIGNER_MAX_SPEED 10000
 
 void aTask(void* pvParameters);
+
+int16_t moveStep();

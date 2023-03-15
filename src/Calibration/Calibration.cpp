@@ -4,9 +4,7 @@
 
 float Calibration::read() {
   if (Serial2.available()) {
-    float read = Serial2.readStringUntil('\n').toFloat();
-
-    this->lastRead = read;
+    this->lastRead = Serial2.readStringUntil('\n').toFloat();
     this->readValueNum++;
     this->readValueSum += this->lastRead;
   }
@@ -16,6 +14,8 @@ float Calibration::read() {
   } else if (this->lastRead > this->maxRead) {
     this->maxRead = this->lastRead;
   }
+
+  Serial2.println(this->lastRead);
 
   return this->lastRead;
 }
@@ -40,4 +40,6 @@ void Calibration::reset() {
   this->lastRead = 0;
   this->readValueNum = 0;
   this->readValueSum = 0;
+
+  Serial2.println("reset");
 }

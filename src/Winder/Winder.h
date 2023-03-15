@@ -10,7 +10,7 @@
 #define PULLER_DIR_PIN 14 // Not connected
 #define PULLER_STEP_PIN 25
 #define PULLER_MAX_SPEED 13200
-#define PULLER_DIAM 24.5 //In mm
+#define PULLER_DIAM 24.5f //In mm
 
 #define MIN_DISTANCE 55
 #define OFFSET_DISTANCE 100
