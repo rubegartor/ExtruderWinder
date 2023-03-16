@@ -70,6 +70,8 @@ void setup() {
 
   rotaryEncoder.init();  // Iniciar el rotary encoder
 
+  pid.init();
+
   pinMode(ALIGNER_HOME_SENSOR_PIN, INPUT_PULLUP);
 
   // espnow.init();  // Iniciar la conexión inalámbrica a través de ESP-Now

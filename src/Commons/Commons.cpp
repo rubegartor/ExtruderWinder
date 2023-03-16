@@ -5,10 +5,13 @@
 #include <RotaryEncoder/RotaryEncoder.h>
 #include <Tensioner/Tensioner.h>
 #include <Calibration/Calibration.h>
+#include <PID/PIDController.h>
 
 #include "soc/timer_group_reg.h"
 #include "soc/timer_group_struct.h"
 
+
+PIDController pid = PIDController();
 LCDMenu lcdMenu = LCDMenu();
 Tensioner tensioner = Tensioner();
 REncoder rotaryEncoder = REncoder();

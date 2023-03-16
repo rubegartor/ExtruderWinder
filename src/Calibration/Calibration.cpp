@@ -15,6 +15,8 @@ float Calibration::read() {
     this->maxRead = this->lastRead;
   }
 
+  pid.compute();
+
   Serial2.println(this->lastRead);
 
   return this->lastRead;

@@ -7,6 +7,7 @@
 #include <RotaryEncoder/RotaryEncoder.h>
 #include <Tensioner/Tensioner.h>
 #include <Calibration/Calibration.h>
+#include <PID/PIDController.h>
 
 #include "soc/timer_group_reg.h"
 #include "soc/timer_group_struct.h"
@@ -18,6 +19,7 @@ const uint16_t oneRevSpool = 3200 * spoolMotorRatio;
 const uint16_t oneRevPuller = 3200;
 const float filamentDiameter = 1.75;
 
+extern PIDController pid;
 extern Calibration calibration;
 extern LCDMenu lcdMenu;
 extern Tensioner tensioner;
