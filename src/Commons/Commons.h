@@ -30,6 +30,7 @@ extern bool homed;
 extern bool needHome;
 extern bool firstSync;
 extern bool pullerState;
+extern bool automaticPuller;
 extern uint16_t actualDistance;
 extern uint16_t spoolTotalRevs;
 extern uint16_t pullerTotalRevs;

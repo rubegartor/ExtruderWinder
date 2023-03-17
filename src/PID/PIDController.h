@@ -4,7 +4,10 @@
 
 class PIDController {
  public:
+  uint16_t minOutput;
+  uint16_t maxOutput;
+
   void init();
 
-  void compute();
+  uint16_t computeSpeed();
 };

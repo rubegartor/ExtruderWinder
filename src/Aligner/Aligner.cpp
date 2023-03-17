@@ -97,6 +97,10 @@ void aTask(void *pvParameters) {
       calibration.read();
     }
 
+    if (automaticPuller) {
+      pullerSpeed = pid.computeSpeed();
+    }
+
     if (updateSummary.TRIGGERED) {
       refreshSummary();
     }

@@ -2,25 +2,22 @@
 #include <PID/PIDController.h>
 #include <PID_v1.h>
 
-// Define Variables we'll be connecting to
-double Setpoint, Input, Output;
+double setPoint, input, output;
+double Kp = 5, Ki = 25, Kd = 0.05;
 
-// Specify the links and initial tuning parameters
-double Kp = 10, Ki = 25, Kd = 0.25;
-PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+PID autoPID(&input, &output, &setPoint, Kp, Ki, Kd, DIRECT);
 
 void PIDController::init() {
-  Setpoint = filamentDiameter;
-  myPID.SetMode(AUTOMATIC);
+  setPoint = filamentDiameter;
+  this->minOutput = 900;
+  this->maxOutput = 1800;
+
+  autoPID.SetMode(AUTOMATIC);
 }
 
-void PIDController::compute() {
-  Input = calibration.lastRead;
-  myPID.Compute();
+uint16_t PIDController::computeSpeed() {
+  input = calibration.lastRead;
+  autoPID.Compute();
   
-  uint16_t computedValue = map(Output, 0, 255, 10000, 900);
-
-  pullerSpeed = computedValue;
-
-  Serial.println(computedValue);
+  return map(output, 0, 255, this->maxOutput, this->minOutput);
 }

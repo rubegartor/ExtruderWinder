@@ -21,6 +21,7 @@ bool homed;
 bool needHome;
 bool firstSync;
 bool pullerState = true;
+bool automaticPuller = true;
 uint16_t actualDistance;
 uint16_t spoolTotalRevs;
 uint16_t pullerTotalRevs;
