@@ -103,8 +103,8 @@ void LCDMenu::initSummary(bool clear) {
   lcd.setCursor(0, 1);
   lcd.print("D");
   lcd.setCursor(2, 1);
-  lcd.print(" " + (String)calibration.minRead + "/" +
-            (String)calibration.lastRead + "/" + (String)calibration.maxRead +
+  lcd.print(" " + (String)measuring.minRead + "/" +
+            (String)measuring.lastRead + "/" + (String)measuring.maxRead +
             "  ");
 }
 
@@ -198,12 +198,12 @@ void LCDMenu::measuringSubMenu() {
   lcd.write(byte(6));
 
   lcd.setCursor(1, 1);
-  lcd.print("Diam. max: " + (String)calibration.maxRange);
+  lcd.print("Diam. max: " + (String)measuring.maxRange);
 
   lcd.setCursor(1, 2);
-  lcd.print("Diam. min: " + (String)calibration.minRange);
+  lcd.print("Diam. min: " + (String)measuring.minRange);
 
-  String calibrationState = calibration.state ? "Encendido" : "Apagado   ";
+  String calibrationState = measuring.state ? "Encendido" : "Apagado   ";
   lcd.setCursor(1, 3);
   lcd.print("Estado: " + calibrationState);
 }
@@ -227,28 +227,28 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
   if (this->inSubMenu && this->selectedMeasuringOption != returnOption) {
     if (rEncoder.direction == increased) {
       if (this->selectedMeasuringOption == minimumOption) {
-        calibration.setMinRange(calibration.minRange + 0.01f);
+        measuring.setMinRange(measuring.minRange + 0.01f);
       }
 
       if (this->selectedMeasuringOption == maximumOption) {
-        calibration.setMaxRange(calibration.maxRange + 0.01f);
+        measuring.setMaxRange(measuring.maxRange + 0.01f);
       }
     } else {
       if (this->selectedMeasuringOption == minimumOption) {
-        calibration.setMinRange(calibration.minRange - 0.01f);
+        measuring.setMinRange(measuring.minRange - 0.01f);
       }
 
       if (this->selectedMeasuringOption == maximumOption) {
-        calibration.setMaxRange(calibration.maxRange - 0.01f);
+        measuring.setMaxRange(measuring.maxRange - 0.01f);
       }
     }
 
     lcd.setCursor(12, this->selectedMeasuringOption);
 
     if (this->selectedMeasuringOption == minimumOption)
-      lcd.print(calibration.minRange);
+      lcd.print(measuring.minRange);
     if (this->selectedMeasuringOption == maximumOption)
-      lcd.print(calibration.maxRange);
+      lcd.print(measuring.maxRange);
 
     return;
   }
@@ -342,10 +342,10 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
   }
 
   if (this->measuringSubMenuOption == stateOption) {
-    calibration.state = !calibration.state;
+    measuring.state = !measuring.state;
 
     lcd.setCursor(9, 3);
-    lcd.print(calibration.state ? "Encendido" : "Apagado   ");
+    lcd.print(measuring.state ? "Encendido" : "Apagado   ");
 
     return;
   }
@@ -394,7 +394,7 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
       case resetCountersOption:
         pullerTotalRevs = 0;
         spoolTotalRevs = 0;
-        calibration.reset();
+        measuring.reset();
         this->initSummary(true);
         break;
       case measuringOption:

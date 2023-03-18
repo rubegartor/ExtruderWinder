@@ -6,7 +6,7 @@
 #include <LCD/LCDMenu.h>
 #include <RotaryEncoder/RotaryEncoder.h>
 #include <Tensioner/Tensioner.h>
-#include <Calibration/Calibration.h>
+#include <Measuring/Measuring.h>
 #include <PID/PIDController.h>
 
 #include "soc/timer_group_reg.h"
@@ -20,7 +20,7 @@ const uint16_t oneRevPuller = 3200;
 const float filamentDiameter = 1.75;
 
 extern PIDController pid;
-extern Calibration calibration;
+extern Measuring measuring;
 extern LCDMenu lcdMenu;
 extern Tensioner tensioner;
 extern REncoder rotaryEncoder;

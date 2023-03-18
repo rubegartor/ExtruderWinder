@@ -12,7 +12,7 @@ AccelStepper alignerMotor(AccelStepper::DRIVER, ALIGNER_STEP_PIN,
 
 BlockNot readDistance(200);
 BlockNot updateSummary(500);
-BlockNot readCalibration(80);
+BlockNot readDiameter(80);
 
 bool homingAligner = false;
 bool firstMove = false;
@@ -93,8 +93,8 @@ void aTask(void *pvParameters) {
       firstMove = true;
     }
 
-    if (readCalibration.TRIGGERED) {
-      calibration.read();
+    if (readDiameter.TRIGGERED) {
+      measuring.read();
     }
 
     if (automaticPuller) {

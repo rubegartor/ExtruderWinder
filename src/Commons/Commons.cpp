@@ -4,7 +4,7 @@
 #include <LCD/LCDMenu.h>
 #include <RotaryEncoder/RotaryEncoder.h>
 #include <Tensioner/Tensioner.h>
-#include <Calibration/Calibration.h>
+#include <Measuring/Measuring.h>
 #include <PID/PIDController.h>
 
 #include "soc/timer_group_reg.h"
@@ -15,7 +15,7 @@ PIDController pid = PIDController();
 LCDMenu lcdMenu = LCDMenu();
 Tensioner tensioner = Tensioner();
 REncoder rotaryEncoder = REncoder();
-Calibration calibration = Calibration();
+Measuring measuring = Measuring();
 
 bool homed;
 bool needHome;
