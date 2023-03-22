@@ -28,7 +28,8 @@ byte backCharacter[] = {B00100, B01110, B11111, B00100,
 // Implementar una función para autocompletar con espacios el buffer
 const char *optionsStr[MENU_OPTIONS_NUMBER] = {
     "Resumen            ", "Velocidad puller  ",  "Posicionar         ",
-    "On/Off puller      ", "Alarmas            ", "Reset contadores   "};
+    "Ajustar            ", "On/Off puller      ", "Configuracion     ",
+    "Reset contadores   "};
 
 const int speeds[4] = {5, 10, 100, 500};
 const int speedsPositions[4] = {2, 5, 9, 14};  // LCD cursor positions
@@ -50,7 +51,7 @@ void LCDMenu::init() {
 
   // Inicializar las variables para el menú
   LCDMenu::menuPosition = 0;
-  LCDMenu::measuringSubMenuOption = 0;
+  LCDMenu::configSubMenuOption = 0;
   LCDMenu::speedOption = 0;
   LCDMenu::inSubMenu = false;
   LCDMenu::inSummary = true;
@@ -103,9 +104,8 @@ void LCDMenu::initSummary(bool clear) {
   lcd.setCursor(0, 1);
   lcd.print("D");
   lcd.setCursor(2, 1);
-  lcd.print(" " + (String)measuring.minRead + "/" +
-            (String)measuring.lastRead + "/" + (String)measuring.maxRead +
-            "  ");
+  lcd.print(" " + (String)measuring.minRead + "/" + (String)measuring.lastRead +
+            "/" + (String)measuring.maxRead + "  ");
 }
 
 void LCDMenu::initMenu(MenuOption option, bool clear) {
@@ -129,8 +129,9 @@ void LCDMenu::initMenu(MenuOption option, bool clear) {
   uint8_t menuOverflow = 0;
 
   if (option >= MENU_MAX_OPTIONS_SHOWED) {
-    if (option == measuringOption) menuOverflow = 1;
-    if (option == resetCountersOption) menuOverflow = 2;
+    if (option == togglePullerOption) menuOverflow = 1;
+    if (option == configOption) menuOverflow = 2;
+    if (option == resetCountersOption) menuOverflow = 3;
 
     maxOptions = MENU_MAX_OPTIONS_SHOWED + menuOverflow;
   }
@@ -172,6 +173,15 @@ void LCDMenu::println(String text, uint8_t row, bool clear) {
 void LCDMenu::pullerSpeedSubMenu() {
   lcd.clear();
 
+  if (measuring.mode == measuringAutoMode) {
+    lcd.setCursor(1, 1);
+    lcd.print("No disponible para");
+    lcd.setCursor(5, 2);
+    lcd.print("este modo.");
+
+    return;
+  }
+
   for (uint8_t i = 0; i < sizeof(speeds) / sizeof(int); i++) {
     lcd.setCursor(speedsPositions[i], 2);
     lcd.print(speeds[i]);
@@ -186,10 +196,10 @@ void LCDMenu::pullerSpeedSubMenu() {
   this->checkLCDButtons(true);
 }
 
-void LCDMenu::measuringSubMenu() {
+void LCDMenu::configSubMenu() {
   lcd.clear();
 
-  lcd.setCursor(0, returnOption);
+  lcd.setCursor(0, this->configSubMenuOption);
   lcd.write(byte(0));
 
   lcd.setCursor(1, 0);
@@ -198,20 +208,19 @@ void LCDMenu::measuringSubMenu() {
   lcd.write(byte(6));
 
   lcd.setCursor(1, 1);
-  lcd.print("Diam. max: " + (String)measuring.maxRange);
+  lcd.print("Modo: " + measuring.measuringModeString());
 
-  lcd.setCursor(1, 2);
-  lcd.print("Diam. min: " + (String)measuring.minRange);
-
-  String calibrationState = measuring.state ? "Encendido" : "Apagado   ";
-  lcd.setCursor(1, 3);
-  lcd.print("Estado: " + calibrationState);
+  if (measuring.mode == measuringAutoMode) {
+    lcd.setCursor(1, 2);
+    String pidStabilizedString = pidPuller.stabilized ? "Si" : "No";
+    lcd.print("Estabilizado: " + pidStabilizedString);
+  }
 }
 
-bool LCDMenu::inMeasuringSubMenuOptions() {
-  return this->inSubMenu && this->menuPosition == measuringOption &&
-         this->measuringSubMenuOption != 0 &&
-         this->measuringSubMenuOption != stateOption;
+bool LCDMenu::inConfigSubMenuOptions() {
+  return this->inSubMenu && this->menuPosition == configOption &&
+         this->configSubMenuOption != 0 &&
+         this->configSubMenuOption != returnConfigOption;
 }
 
 void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
@@ -224,40 +233,13 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
 
   if (this->inSummary) return;
 
-  if (this->inSubMenu && this->selectedMeasuringOption != returnOption) {
-    if (rEncoder.direction == increased) {
-      if (this->selectedMeasuringOption == minimumOption) {
-        measuring.setMinRange(measuring.minRange + 0.01f);
-      }
-
-      if (this->selectedMeasuringOption == maximumOption) {
-        measuring.setMaxRange(measuring.maxRange + 0.01f);
-      }
-    } else {
-      if (this->selectedMeasuringOption == minimumOption) {
-        measuring.setMinRange(measuring.minRange - 0.01f);
-      }
-
-      if (this->selectedMeasuringOption == maximumOption) {
-        measuring.setMaxRange(measuring.maxRange - 0.01f);
-      }
-    }
-
-    lcd.setCursor(12, this->selectedMeasuringOption);
-
-    if (this->selectedMeasuringOption == minimumOption)
-      lcd.print(measuring.minRange);
-    if (this->selectedMeasuringOption == maximumOption)
-      lcd.print(measuring.maxRange);
-
-    return;
-  }
-
   if (this->inSubMenu) {
     uint16_t actualPullerSpeed = pullerSpeed;
 
     switch (this->menuPosition) {
       case pullerSpeedOption:
+        if (measuring.mode == measuringAutoMode) break;
+
         if (rEncoder.direction == increased) {
           if (actualPullerSpeed + speeds[this->speedOption] >
               PULLER_MAX_SPEED) {
@@ -281,29 +263,31 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
         lcd.setCursor(2, 0);
         lcd.print(pullerSpeedBuffer);
         break;
-      case measuringOption:
-        for (uint8_t i = 0; i < MENU_MAX_OPTIONS_SHOWED; i++) {
+      case configOption:
+        uint8_t omitOptions = 0;
+
+        if (measuring.mode == measuringManualMode) {
+          omitOptions = 1;
+        }
+
+        for (uint8_t i = 0; i < MENU_CONFIG_OPTIONS_NUMBER - omitOptions; i++) {
           lcd.setCursor(0, i);
           lcd.print(" ");
         }
 
         if (rEncoder.direction == increased) {
-          if (this->measuringSubMenuOption < MENU_MAX_OPTIONS_SHOWED - 1) {
-            this->measuringSubMenuOption++;
+          if (this->configSubMenuOption <
+              MENU_CONFIG_OPTIONS_NUMBER - omitOptions - 1) {
+            this->configSubMenuOption++;
           }
         } else {
-          if (this->measuringSubMenuOption > 0) {
-            this->measuringSubMenuOption--;
+          if (this->configSubMenuOption > 0) {
+            this->configSubMenuOption--;
           }
         }
 
-        lcd.setCursor(0, this->measuringSubMenuOption);
-        if (this->measuringSubMenuOption == stateOption ||
-            this->measuringSubMenuOption == returnOption) {
-          lcd.write(byte(0));
-        } else {
-          lcd.write(byte(4));
-        }
+        lcd.setCursor(0, this->configSubMenuOption);
+        lcd.write(byte(0));
         break;
     }
 
@@ -327,41 +311,36 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
     return;
   }
 
-  if (this->selectedMeasuringOption == minimumOption ||
-      this->selectedMeasuringOption == maximumOption) {
-    this->selectedMeasuringOption = (MeasuringSubMenuOption)0;
+  if (this->configSubMenuOption == statusMeasuringOption) {
+    uint8_t measuringMode = measuring.mode;
 
-    for (uint8_t i = 0; i < MENU_MAX_OPTIONS_SHOWED; i++) {
-      lcd.setCursor(0, i);
-      lcd.print(" ");
+    if (measuring.mode == measuringAutoMode) {
+      measuringMode = measuringManualMode;
+      pullerSpeed = DEFAULT_PULLER_SPEED;
     }
 
-    lcd.setCursor(0, this->measuringSubMenuOption);
-    lcd.write(byte(4));
-    return;
-  }
+    if (measuring.mode == measuringManualMode)
+      measuringMode = measuringAutoMode;
 
-  if (this->measuringSubMenuOption == stateOption) {
-    measuring.state = !measuring.state;
+    measuring.mode = (MeasuringMode)measuringMode;
+    pref.putUInt(MEASURING_MODE_PREF, measuring.mode);
 
-    lcd.setCursor(9, 3);
-    lcd.print(measuring.state ? "Encendido" : "Apagado   ");
+    this->configSubMenu();
 
     return;
   }
 
-  if (inMeasuringSubMenuOptions()) {
-    this->selectedMeasuringOption =
-        (MeasuringSubMenuOption)this->measuringSubMenuOption;
+  if (this->configSubMenuOption == stabilizedPIDOption) {
+    pidPuller.stabilized = !pidPuller.stabilized;
 
-    lcd.setCursor(0, this->selectedMeasuringOption);
-    lcd.write(byte(0));
+    lcd.setCursor(15, 2);
+    lcd.print(pidPuller.stabilized ? "Si" : "No");
+
     return;
   }
 
   if (this->inSubMenu) {
-    this->measuringSubMenuOption = 0;
-    this->selectedMeasuringOption = returnOption;
+    this->configSubMenuOption = 0;
     // -----------------------------------------------------------
     this->inSubMenu = false;
     this->initMenu((MenuOption)this->menuPosition, true);
@@ -397,9 +376,9 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
         measuring.reset();
         this->initSummary(true);
         break;
-      case measuringOption:
+      case configOption:
         this->inSubMenu = true;
-        this->measuringSubMenu();
+        this->configSubMenu();
         break;
     }
   }

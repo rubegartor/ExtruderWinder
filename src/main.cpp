@@ -39,7 +39,7 @@ void setup() {
   driverAligner.begin();           // Initiate pins and registers
   driverAligner.toff(4);           // off time
   driverAligner.blank_time(24);    // blank time
-  driverAligner.rms_current(550);  // 550mAh RMS
+  driverAligner.rms_current(400);  // 400mAh RMS
   driverAligner.microsteps(2);     // 2 microsteps
 
   driverSpool.begin();              // Initiate pins and registers
@@ -60,6 +60,10 @@ void setup() {
 
   digitalWrite(ALIGNER_DIR_PIN, LOW);
 
+  pref.begin(NAMESPACE, false);
+
+  measuring.init();
+
   lcdMenu.init();  // Iniciar el LCD
 
   lcdMenu.println(F("    Iniciando..."), 1, true);
@@ -70,11 +74,11 @@ void setup() {
 
   rotaryEncoder.init();  // Iniciar el rotary encoder
 
-  pid.init();
+  pidPuller.init();
+
+  pidSpooler.init();
 
   pinMode(ALIGNER_HOME_SENSOR_PIN, INPUT_PULLUP);
-
-  // espnow.init();  // Iniciar la conexión inalámbrica a través de ESP-Now
 
   xTaskCreatePinnedToCore(
       wTask,       /* Task function. */

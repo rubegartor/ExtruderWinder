@@ -2,6 +2,10 @@
 #include <Commons/Commons.h>
 #include <Measuring/Measuring.h>
 
+void Measuring::init() {
+  this->mode = (MeasuringMode)pref.getUInt(MEASURING_MODE_PREF, measuringManualMode);
+}
+
 float Measuring::read() {
   if (Serial2.available()) {
     this->lastRead = Serial2.readStringUntil('\n').toFloat();
@@ -20,14 +24,6 @@ float Measuring::read() {
   return this->lastRead;
 }
 
-void Measuring::setMinRange(float value) { this->minRange = value; }
-
-void Measuring::setMaxRange(float value) { this->maxRange = value; }
-
-bool Measuring::checkInRange() {
-  return this->lastRead >= this->minRange && this->lastRead <= this->maxRange;
-}
-
 float Measuring::average() {
   if (this->readValueNum == 0) return 0.00f;
 
@@ -42,4 +38,18 @@ void Measuring::reset() {
   this->readValueSum = 0;
 
   Serial2.println("reset");
+}
+
+String Measuring::measuringModeString() {
+  String measuringModeString = "";
+
+  if (measuring.mode == measuringAutoMode) {
+    measuringModeString = "Auto  ";
+  }
+
+  if (measuring.mode == measuringManualMode) {
+    measuringModeString = "Manual";
+  }
+
+  return measuringModeString;
 }

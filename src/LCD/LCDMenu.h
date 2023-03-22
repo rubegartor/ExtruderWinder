@@ -5,8 +5,11 @@
 
 #define LCD_BTN_PIN 34
 
-#define MENU_OPTIONS_NUMBER 6
+#define MENU_OPTIONS_NUMBER 7
 #define MENU_MAX_OPTIONS_SHOWED 4
+
+#define MENU_CONFIG_OPTIONS_NUMBER 3
+
 #define LCD_ADRRESS 0x27
 #define LCD_BUFFER 20
 
@@ -14,32 +17,31 @@ enum MenuOption {
   summaryOption,
   pullerSpeedOption,
   homeAlignerOption,
+  adjustOption,
   togglePullerOption,
-  measuringOption,
+  configOption,
   resetCountersOption
 };
 
-enum MeasuringSubMenuOption {
-  returnOption,
-  maximumOption,
-  minimumOption,
-  stateOption
+enum ConfigSubMenuOption {
+  returnConfigOption,
+  statusMeasuringOption,
+  stabilizedPIDOption
 };
 
 class LCDMenu {
  private:
   MenuOption selectedOption;
-  MeasuringSubMenuOption selectedMeasuringOption;
 
   bool inSubMenu;
   uint8_t speedOption;
-  uint8_t measuringSubMenuOption;
+  uint8_t configSubMenuOption;
 
-  bool inMeasuringSubMenuOptions();
+  bool inConfigSubMenuOptions();
 
   void initMenu(MenuOption option = summaryOption, bool clear = false);
 
-  void measuringSubMenu();
+  void configSubMenu();
 
   void pullerSpeedSubMenu();
 

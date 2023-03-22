@@ -97,8 +97,8 @@ void aTask(void *pvParameters) {
       measuring.read();
     }
 
-    if (automaticPuller) {
-      pullerSpeed = pid.computeSpeed();
+    if (measuring.mode == measuringAutoMode) {
+      pullerSpeed = pidPuller.computeSpeed();
     }
 
     if (updateSummary.TRIGGERED) {

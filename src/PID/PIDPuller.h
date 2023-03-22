@@ -2,15 +2,15 @@
 
 #include <Arduino.h>
 
-#define MAX_VALID_DEVIATION 0.08f
+#define MIN_PID_OUTPUT_LIMIT 0
+#define MAX_PID_OUTPUT_LIMIT 255
+#define PID_AGGRESSIVE_GAP 0.18f
 
-class PIDController {
+class PIDPuller {
  private:
-  uint16_t lastComputedDiameter;
   uint16_t lastComputed;
 
-  bool isValidToCompute(float input);
-
+  void doCompute(float input);
  public:
   bool stabilized;
   uint16_t minOutput;

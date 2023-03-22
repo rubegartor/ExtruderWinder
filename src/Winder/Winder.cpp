@@ -6,23 +6,13 @@
 AccelStepper spoolMotor(AccelStepper::DRIVER, SPOOL_STEP_PIN, SPOOL_DIR_PIN);
 AccelStepper pullerMotor(AccelStepper::DRIVER, PULLER_STEP_PIN, PULLER_DIR_PIN);
 
-bool run;
-bool minTriggered;
-
 void initWinder() { spoolMotor.setMaxSpeed(SPOOL_MAX_SPEED); }
 
 void IRAM_ATTR winderLoop() {
-  if (actualDistance <= MIN_DISTANCE) {
-    minTriggered = true;
-    run = false;
-  }
 
-  if (minTriggered && (actualDistance - OFFSET_DISTANCE) > 60) {
-    run = true;
-    minTriggered = false;
-  }
+  if (homed && pullerState) {
+    spoolSpeed = pidSpooler.computeSpeed();
 
-  if (homed && run && pullerState) {
     spoolMotor.setSpeed(spoolSpeed);
     spoolMotor.runSpeed();
 

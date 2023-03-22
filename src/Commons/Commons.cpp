@@ -5,13 +5,16 @@
 #include <RotaryEncoder/RotaryEncoder.h>
 #include <Tensioner/Tensioner.h>
 #include <Measuring/Measuring.h>
-#include <PID/PIDController.h>
+#include <PID/PIDPuller.h>
+#include <PID/PIDSpooler.h>
+#include <Preferences.h>
 
 #include "soc/timer_group_reg.h"
 #include "soc/timer_group_struct.h"
 
-
-PIDController pid = PIDController();
+Preferences pref;
+PIDPuller pidPuller = PIDPuller();
+PIDSpooler pidSpooler = PIDSpooler();
 LCDMenu lcdMenu = LCDMenu();
 Tensioner tensioner = Tensioner();
 REncoder rotaryEncoder = REncoder();
@@ -19,14 +22,12 @@ Measuring measuring = Measuring();
 
 bool homed;
 bool needHome;
-bool firstSync;
 bool pullerState = true;
-bool automaticPuller = true;
 uint16_t actualDistance;
 uint16_t spoolTotalRevs;
 uint16_t pullerTotalRevs;
 uint16_t spoolSpeed = pullerSpeed * speedRatioMultiplier;
-uint16_t pullerSpeed = 1500;
+uint16_t pullerSpeed = DEFAULT_PULLER_SPEED;
 
 bool isReady() { return homed && !needHome; }
 
