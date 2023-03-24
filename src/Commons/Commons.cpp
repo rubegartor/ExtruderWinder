@@ -2,32 +2,39 @@
 #include <Arduino.h>
 #include <Commons/Commons.h>
 #include <LCD/LCDMenu.h>
-#include <RotaryEncoder/RotaryEncoder.h>
-#include <Tensioner/Tensioner.h>
 #include <Measuring/Measuring.h>
 #include <PID/PIDPuller.h>
 #include <PID/PIDSpooler.h>
 #include <Preferences.h>
+#include <RotaryEncoder/RotaryEncoder.h>
+#include <Tensioner/Tensioner.h>
 
 #include "soc/timer_group_reg.h"
 #include "soc/timer_group_struct.h"
 
 Preferences pref;
-PIDPuller pidPuller = PIDPuller();
-PIDSpooler pidSpooler = PIDSpooler();
-LCDMenu lcdMenu = LCDMenu();
-Tensioner tensioner = Tensioner();
-REncoder rotaryEncoder = REncoder();
-Measuring measuring = Measuring();
+PIDPuller pidPuller;
+PIDSpooler pidSpooler;
+LCDMenu lcdMenu;
+Tensioner tensioner;
+REncoder rotaryEncoder;
+Measuring measuring;
 
 bool homed;
 bool needHome;
-bool pullerState = true;
 uint16_t actualDistance;
 uint16_t spoolTotalRevs;
 uint16_t pullerTotalRevs;
-uint16_t spoolSpeed = pullerSpeed * speedRatioMultiplier;
+uint16_t spoolSpeed = DEFAULT_WINDER_SPEED;
 uint16_t pullerSpeed = DEFAULT_PULLER_SPEED;
+float filamentDiameter = DEFAULT_FILAMENT_DIAMETER;
+
+void commonsInit() {
+  filamentDiameter =
+      pref.getFloat(FILAMENT_DIAMETER_MODE_PREF, DEFAULT_FILAMENT_DIAMETER);
+
+  pidPuller.updateSetPoint(filamentDiameter);
+}
 
 bool isReady() { return homed && !needHome; }
 

@@ -2,41 +2,47 @@
 #include <PID/PIDPuller.h>
 #include <PID_v1.h>
 
-double setPoint, input, output;
-double aggKp = 5, aggKi = 25, aggKd = 0.05;
-double Kp = 2, Ki = 12.5, Kd = 1;
-
-PID autoPID(&input, &output, &setPoint, Kp, Ki, Kd, DIRECT);
+PID pullerPID(0, 0, 0, 0, 0, 0, DIRECT);
 
 void PIDPuller::init() {
-  setPoint = filamentDiameter;
+  PID pid(&this->input, &this->output, &this->setPoint, this->Kp, this->Ki,
+          this->Kd, DIRECT);
+
+  pullerPID = pid;
+
+  this->setPoint = filamentDiameter;
   this->minOutput = 1000;
-  this->maxOutput = 2000;
+  this->maxOutput = 2200;
 
   this->stabilized = false;
 
-  autoPID.SetMode(AUTOMATIC);
+  pullerPID.SetMode(AUTOMATIC);
+}
+
+void PIDPuller::updateSetPoint(float setPoint) {
+  this->setPoint = setPoint;
 }
 
 uint16_t PIDPuller::computeSpeed() {
-  input = measuring.lastRead;
+  this->input = measuring.lastRead;
 
-  double gap = abs(setPoint - input);
+  double gap = abs(this->setPoint - this->input);
 
   if (!this->stabilized && gap > PID_AGGRESSIVE_GAP) {
-    autoPID.SetTunings(aggKp, aggKi, aggKd);
+    pullerPID.SetTunings(this->aggKp, this->aggKi, this->aggKd);
   } else {
-    autoPID.SetTunings(Kp, Ki, Kd);
+    pullerPID.SetTunings(this->Kp, this->Ki, this->Kd);
   }
 
-  this->doCompute(input);
+  this->doCompute(this->input);
 
   return this->lastComputed;
 }
 
 void PIDPuller::doCompute(float input) {
-  autoPID.Compute();
+  pullerPID.Compute();
 
-  this->lastComputed = map(output, MIN_PID_OUTPUT_LIMIT, MAX_PID_OUTPUT_LIMIT,
-                           this->maxOutput, this->minOutput);
+  this->lastComputed =
+      map(this->output, MIN_PID_PULLER_OUTPUT_LIMIT, MAX_PID_PULLER_OUTPUT_LIMIT,
+          this->maxOutput, this->minOutput);
 }

@@ -27,9 +27,8 @@ byte backCharacter[] = {B00100, B01110, B11111, B00100,
 
 // Implementar una función para autocompletar con espacios el buffer
 const char *optionsStr[MENU_OPTIONS_NUMBER] = {
-    "Resumen            ", "Velocidad puller  ",  "Posicionar         ",
-    "Ajustar            ", "On/Off puller      ", "Configuracion     ",
-    "Reset contadores   "};
+    "Resumen            ", "Velocidad puller  ", "Posicionar         ",
+    "Ajustar            ", "Configuracion     ", "Reset contadores   "};
 
 const int speeds[4] = {5, 10, 100, 500};
 const int speedsPositions[4] = {2, 5, 9, 14};  // LCD cursor positions
@@ -129,9 +128,8 @@ void LCDMenu::initMenu(MenuOption option, bool clear) {
   uint8_t menuOverflow = 0;
 
   if (option >= MENU_MAX_OPTIONS_SHOWED) {
-    if (option == togglePullerOption) menuOverflow = 1;
-    if (option == configOption) menuOverflow = 2;
-    if (option == resetCountersOption) menuOverflow = 3;
+    if (option == configOption) menuOverflow = 1;
+    if (option == resetCountersOption) menuOverflow = 2;
 
     maxOptions = MENU_MAX_OPTIONS_SHOWED + menuOverflow;
   }
@@ -155,7 +153,7 @@ void LCDMenu::initMenu(MenuOption option, bool clear) {
       lcd.print("]     ");
     }
 
-    if (strOpt.startsWith("Velocidad puller") || strOpt.startsWith("Alarmas") ||
+    if (strOpt.startsWith("Velocidad puller") ||
         strOpt.startsWith("Posicionar")) {
       lcd.setCursor(19, j - menuOverflow);
       lcd.write(byte(7));
@@ -176,8 +174,8 @@ void LCDMenu::pullerSpeedSubMenu() {
   if (measuring.mode == measuringAutoMode) {
     lcd.setCursor(1, 1);
     lcd.print("No disponible para");
-    lcd.setCursor(5, 2);
-    lcd.print("este modo.");
+    lcd.setCursor(2, 2);
+    lcd.print("modo automatico.");
 
     return;
   }
@@ -214,12 +212,14 @@ void LCDMenu::configSubMenu() {
     lcd.setCursor(1, 2);
     String pidStabilizedString = pidPuller.stabilized ? "Si" : "No";
     lcd.print("Estabilizado: " + pidStabilizedString);
+
+    lcd.setCursor(1, 3);
+    lcd.print("Diametro: " + (String)filamentDiameter);
   }
 }
 
 bool LCDMenu::inConfigSubMenuOptions() {
   return this->inSubMenu && this->menuPosition == configOption &&
-         this->configSubMenuOption != 0 &&
          this->configSubMenuOption != returnConfigOption;
 }
 
@@ -232,6 +232,24 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
   }
 
   if (this->inSummary) return;
+
+  if (this->inConfigSubMenuOptions() &&
+      this->configSubMenuOptionSelected == targetDiameterOption) {
+    if (rEncoder.direction == increased) {
+      filamentDiameter += 0.01f;
+    } else {
+      filamentDiameter -= 0.01f;
+    }
+
+    // Guardar el último diametro de filamento seleccionado
+    pref.putFloat(FILAMENT_DIAMETER_MODE_PREF, filamentDiameter);
+    pidPuller.updateSetPoint(filamentDiameter);
+
+    lcd.setCursor(11, 3);
+    lcd.print(filamentDiameter);
+
+    return;
+  }
 
   if (this->inSubMenu) {
     uint16_t actualPullerSpeed = pullerSpeed;
@@ -255,8 +273,6 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
           }
         }
 
-        spoolSpeed = (uint16_t)pullerSpeed * speedRatioMultiplier;
-
         char pullerSpeedBuffer[LCD_BUFFER];
         sprintf(pullerSpeedBuffer, "Velocidad: %-5d", pullerSpeed);
 
@@ -267,7 +283,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
         uint8_t omitOptions = 0;
 
         if (measuring.mode == measuringManualMode) {
-          omitOptions = 1;
+          omitOptions = 2;
         }
 
         for (uint8_t i = 0; i < MENU_CONFIG_OPTIONS_NUMBER - omitOptions; i++) {
@@ -339,6 +355,20 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
     return;
   }
 
+  if (this->configSubMenuOption == targetDiameterOption) {
+    lcd.setCursor(0, 3);
+
+    if (this->configSubMenuOptionSelected != targetDiameterOption) {
+      this->configSubMenuOptionSelected = targetDiameterOption;
+      lcd.write(byte(4));
+    } else {
+      this->configSubMenuOptionSelected = returnConfigOption;
+      lcd.write(byte(0));
+    }
+
+    return;
+  }
+
   if (this->inSubMenu) {
     this->configSubMenuOption = 0;
     // -----------------------------------------------------------
@@ -366,13 +396,9 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
         this->inSubMenu = true;
         this->pullerSpeedSubMenu();
         break;
-      case togglePullerOption:
-        pullerState = !pullerState;
-        lcd.setCursor(1, this->menuPosition);
-        break;
       case resetCountersOption:
         pullerTotalRevs = 0;
-        spoolTotalRevs = 0;
+        resetSpoolerRevs();
         measuring.reset();
         this->initSummary(true);
         break;

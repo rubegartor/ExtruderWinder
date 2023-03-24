@@ -24,7 +24,7 @@ void setup() {
   while (!Serial2)
     ;
 
-  Serial2.println(F("Starting Serial2..."));
+  Serial.println(F("Starting Serial2..."));
 
   pinMode(SPOOL_CS_PIN, OUTPUT);
   digitalWrite(SPOOL_CS_PIN, HIGH);
@@ -61,6 +61,8 @@ void setup() {
   digitalWrite(ALIGNER_DIR_PIN, LOW);
 
   pref.begin(NAMESPACE, false);
+
+  commonsInit();
 
   measuring.init();
 

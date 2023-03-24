@@ -1,7 +1,6 @@
 #include <AccelStepper.h>
 #include <Commons/Commons.h>
 #include <Winder/Winder.h>
-#include <mat.h>
 
 AccelStepper spoolMotor(AccelStepper::DRIVER, SPOOL_STEP_PIN, SPOOL_DIR_PIN);
 AccelStepper pullerMotor(AccelStepper::DRIVER, PULLER_STEP_PIN, PULLER_DIR_PIN);
@@ -9,8 +8,7 @@ AccelStepper pullerMotor(AccelStepper::DRIVER, PULLER_STEP_PIN, PULLER_DIR_PIN);
 void initWinder() { spoolMotor.setMaxSpeed(SPOOL_MAX_SPEED); }
 
 void IRAM_ATTR winderLoop() {
-
-  if (homed && pullerState) {
+  if (homed) {
     spoolSpeed = pidSpooler.computeSpeed();
 
     spoolMotor.setSpeed(spoolSpeed);
@@ -26,10 +24,8 @@ void IRAM_ATTR winderLoop() {
 void initPuller() { pullerMotor.setMaxSpeed(PULLER_MAX_SPEED); }
 
 void IRAM_ATTR pullerLoop() {
-  if (pullerState) {
-    pullerMotor.setSpeed(pullerSpeed);
-    pullerMotor.runSpeed();
-  }
+  pullerMotor.setSpeed(pullerSpeed);
+  pullerMotor.runSpeed();
 
   if (pullerMotor.currentPosition() >= oneRevPuller) {
     pullerTotalRevs++;

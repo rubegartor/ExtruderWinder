@@ -185,3 +185,8 @@ void aTask(void *pvParameters) {
     watchDogFeed();
   }
 }
+
+void resetSpoolerRevs() {
+  lastTotalRevs = 0;
+  spoolTotalRevs = 0;
+}

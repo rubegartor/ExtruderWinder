@@ -1,32 +1,35 @@
 #include <Commons/Commons.h>
 #include <PID/PIDSpooler.h>
-#include <Winder/Winder.h>
 #include <PID_v1.h>
+#include <Winder/Winder.h>
 
-double setPoint1, input1, output1;
-double Kp1 = 3, Ki1 = 1.5, Kd1 = 0.05;
-
-PID autoPID1(&input1, &output1, &setPoint1, Kp1, Ki1, Kd1, DIRECT);
+PID spoolerPID(0, 0, 0, 0, 0, 0, DIRECT);
 
 void PIDSpooler::init() {
-  setPoint1 = 125;
+  PID pid(&this->input, &this->output, &this->setPoint, this->Kp, this->Ki,
+               this->Kd, DIRECT);
+
+  spoolerPID = pid;
+
+  this->setPoint = SETPOINT_PID_SPOOLER;
   this->minOutput = 0;
   this->maxOutput = SPOOL_MAX_SPEED / 2;
 
-  autoPID1.SetMode(AUTOMATIC);
+  spoolerPID.SetMode(AUTOMATIC);
 }
 
 uint16_t PIDSpooler::computeSpeed() {
-  input1 = actualDistance;
+  this->input = actualDistance;
 
-  this->doCompute(input1);
+  this->doCompute(this->input);
 
   return this->lastComputed;
 }
 
 void PIDSpooler::doCompute(float input) {
-  autoPID1.Compute();
+  spoolerPID.Compute();
 
-  this->lastComputed = map(output1, MIN_PID_OUTPUT_LIMIT, MAX_PID_OUTPUT_LIMIT,
-                           this->maxOutput, this->minOutput);
+  this->lastComputed =
+      map(this->output, MIN_PID_SPOOLER_OUTPUT_LIMIT, MAX_PID_SPOOLER_OUTPUT_LIMIT,
+          this->maxOutput, this->minOutput);
 }
