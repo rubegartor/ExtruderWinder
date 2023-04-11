@@ -11,10 +11,8 @@ void PIDPuller::init() {
   pullerPID = pid;
 
   this->setPoint = filamentDiameter;
-  this->minOutput = 1000;
+  this->minOutput = 950;
   this->maxOutput = 2200;
-
-  this->stabilized = false;
 
   pullerPID.SetMode(AUTOMATIC);
 }
@@ -28,7 +26,7 @@ uint16_t PIDPuller::computeSpeed() {
 
   double gap = abs(this->setPoint - this->input);
 
-  if (!this->stabilized && gap > PID_AGGRESSIVE_GAP) {
+  if (gap > PID_AGGRESSIVE_GAP) {
     pullerPID.SetTunings(this->aggKp, this->aggKi, this->aggKd);
   } else {
     pullerPID.SetTunings(this->Kp, this->Ki, this->Kd);

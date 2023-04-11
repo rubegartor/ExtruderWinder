@@ -34,8 +34,7 @@ bool REncoder::changed() {
   if (changed) {
     long value = PhysREncoder.readEncoder();
 
-    this->direction =
-        value >= this->lastReadValue ? increased : decreased;
+    this->direction = value >= this->lastReadValue ? increased : decreased;
 
     if (value != this->lastReadValue) {
       this->lastReadValue = value;

@@ -84,6 +84,8 @@ void aTask(void *pvParameters) {
   lcdMenu.initSummary(true);
 
   for (;;) {
+    wifiOut.receive();
+
     if (!firstMove) {
       alignerMotor.setSpeed(2000);
       alignerMotor.setAcceleration(20000);
@@ -169,7 +171,7 @@ void aTask(void *pvParameters) {
 
       if (homed && isEndPosSet) {
         if (readDistance.TRIGGERED) {
-          actualDistance = tensioner.getDistance();
+          tensioner.getDistance();
         }
       }
 

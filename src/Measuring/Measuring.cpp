@@ -3,12 +3,15 @@
 #include <Measuring/Measuring.h>
 
 void Measuring::init() {
-  this->mode = (MeasuringMode)pref.getUInt(MEASURING_MODE_PREF, measuringManualMode);
+  this->mode =
+      (MeasuringMode)pref.getUInt(MEASURING_MODE_PREF, measuringManualMode);
 }
 
 float Measuring::read() {
-  if (Serial2.available()) {
-    this->lastRead = Serial2.readStringUntil('\n').toFloat();
+  if (Serial2.available() > 0) {
+    String read = Serial2.readStringUntil('\n');
+
+    this->lastRead = atof(read.c_str());
     this->readValueNum++;
     this->readValueSum += this->lastRead;
   }
@@ -18,8 +21,6 @@ float Measuring::read() {
   } else if (this->lastRead > this->maxRead) {
     this->maxRead = this->lastRead;
   }
-
-  Serial2.println(this->lastRead);
 
   return this->lastRead;
 }
@@ -36,8 +37,6 @@ void Measuring::reset() {
   this->lastRead = 0;
   this->readValueNum = 0;
   this->readValueSum = 0;
-
-  Serial2.println("reset");
 }
 
 String Measuring::measuringModeString() {

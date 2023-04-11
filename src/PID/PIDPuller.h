@@ -4,7 +4,7 @@
 
 #define MIN_PID_PULLER_OUTPUT_LIMIT 0
 #define MAX_PID_PULLER_OUTPUT_LIMIT 255
-#define PID_AGGRESSIVE_GAP 0.18f
+#define PID_AGGRESSIVE_GAP 0.5f
 
 class PIDPuller {
  private:
@@ -16,7 +16,6 @@ class PIDPuller {
   void doCompute(float input);
 
  public:
-  bool stabilized;
   uint16_t minOutput;
   uint16_t maxOutput;
 

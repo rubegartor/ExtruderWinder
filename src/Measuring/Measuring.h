@@ -5,10 +5,7 @@
 
 #define MEASURING_MODE_PREF "measuringMode"
 
-enum MeasuringMode {
-  measuringAutoMode,
-  measuringManualMode
-};
+enum MeasuringMode { measuringAutoMode, measuringManualMode };
 
 class Measuring {
  public:

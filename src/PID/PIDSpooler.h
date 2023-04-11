@@ -13,7 +13,7 @@ class PIDSpooler {
   uint16_t lastComputed;
   double Kp = 3;
   double Ki = 1.5;
-  double Kd = 0.05;
+  double Kd = 0.03;
   double setPoint, input, output;
 
   void doCompute(float input);

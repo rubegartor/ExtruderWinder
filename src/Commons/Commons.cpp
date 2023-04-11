@@ -13,6 +13,7 @@
 #include "soc/timer_group_struct.h"
 
 Preferences pref;
+WifiOut wifiOut;
 PIDPuller pidPuller;
 PIDSpooler pidSpooler;
 LCDMenu lcdMenu;
@@ -22,12 +23,12 @@ Measuring measuring;
 
 bool homed;
 bool needHome;
-uint16_t actualDistance;
 uint16_t spoolTotalRevs;
 uint16_t pullerTotalRevs;
-uint16_t spoolSpeed = DEFAULT_WINDER_SPEED;
+uint16_t spoolSpeed = 0;
 uint16_t pullerSpeed = DEFAULT_PULLER_SPEED;
 float filamentDiameter = DEFAULT_FILAMENT_DIAMETER;
+long millisOffset = 0;
 
 void commonsInit() {
   filamentDiameter =
@@ -37,6 +38,16 @@ void commonsInit() {
 }
 
 bool isReady() { return homed && !needHome; }
+
+String getTime(unsigned long millis) {
+  unsigned int seconds = (millis / 1000) % 60;
+  unsigned int minutes = (millis / (1000 * 60)) % 60;
+  unsigned int hours = (millis / (1000 * 60 * 60)) % 24;
+
+  char time_str[9];
+  sprintf(time_str, "%02d:%02d:%02d", hours, minutes, seconds);
+  return String(time_str);
+}
 
 void IRAM_ATTR watchDogFeed() {
   TIMERG0.wdt_wprotect = TIMG_WDT_WKEY_VALUE;

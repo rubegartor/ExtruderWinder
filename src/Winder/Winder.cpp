@@ -47,6 +47,7 @@ void IRAM_ATTR wTask(void* pvParameters) {
 
 float getExtrudedLength() {
   float circ = PI * ((float)PULLER_DIAM / (float)1000);
+  float value = circ * (float)pullerTotalRevs;
 
   return circ * (float)pullerTotalRevs;
 }

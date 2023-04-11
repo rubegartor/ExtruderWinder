@@ -8,7 +8,7 @@
 #define MENU_OPTIONS_NUMBER 6
 #define MENU_MAX_OPTIONS_SHOWED 4
 
-#define MENU_CONFIG_OPTIONS_NUMBER 4
+#define MENU_CONFIG_OPTIONS_NUMBER 3
 
 #define LCD_ADRRESS 0x27
 #define LCD_BUFFER 20
@@ -17,15 +17,14 @@ enum MenuOption {
   summaryOption,
   pullerSpeedOption,
   homeAlignerOption,
-  adjustOption,
   configOption,
-  resetCountersOption
+  resetCountersOption,
+  infoOption
 };
 
 enum ConfigSubMenuOption {
   returnConfigOption,
   statusMeasuringOption,
-  stabilizedPIDOption,
   targetDiameterOption
 };
 
@@ -42,9 +41,11 @@ class LCDMenu {
 
   void initMenu(MenuOption option = summaryOption, bool clear = false);
 
-  void configSubMenu();
+  void configSubMenu(bool clear = false);
 
   void pullerSpeedSubMenu();
+
+  void infoSubMenu();
 
   void setSpeedButtonUnderscore();
 

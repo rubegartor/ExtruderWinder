@@ -13,13 +13,13 @@ void PIDSpooler::init() {
 
   this->setPoint = SETPOINT_PID_SPOOLER;
   this->minOutput = 0;
-  this->maxOutput = SPOOL_MAX_SPEED / 2;
+  this->maxOutput = SPOOL_MAX_SPEED;
 
   spoolerPID.SetMode(AUTOMATIC);
 }
 
 uint16_t PIDSpooler::computeSpeed() {
-  this->input = actualDistance;
+  this->input = tensioner.lastRead;
 
   this->doCompute(this->input);
 

@@ -1,5 +1,5 @@
-#include <Tensioner/Tensioner.h>
 #include <Commons/Commons.h>
+#include <Tensioner/Tensioner.h>
 #include <VL53L0X.h>
 
 VL53L0X lox;
@@ -16,5 +16,7 @@ void Tensioner::init() {
 }
 
 uint16_t IRAM_ATTR Tensioner::getDistance() {
-  return lox.readRangeSingleMillimeters();
+  this->lastRead = lox.readRangeSingleMillimeters();
+  
+  return this->lastRead;
 }
