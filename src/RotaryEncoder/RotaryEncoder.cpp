@@ -26,7 +26,13 @@ void REncoder::init() {
   REncoder::lastReadValue = -1;
 }
 
-bool REncoder::clicked() { return PhysREncoder.isEncoderButtonClicked(); }
+bool REncoder::clicked() {
+  bool isClicked = PhysREncoder.isEncoderButtonClicked();
+
+  if (isClicked) doBeep();
+
+  return isClicked;
+}
 
 bool REncoder::changed() {
   bool changed = PhysREncoder.encoderChanged();

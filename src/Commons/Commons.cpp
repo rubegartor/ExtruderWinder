@@ -40,13 +40,19 @@ void commonsInit() {
 bool isReady() { return homed && !needHome; }
 
 String getTime(unsigned long millis) {
-  unsigned int seconds = (millis / 1000) % 60;
-  unsigned int minutes = (millis / (1000 * 60)) % 60;
-  unsigned int hours = (millis / (1000 * 60 * 60)) % 24;
+  uint64_t seconds = (millis / 1000) % 60;
+  uint64_t  minutes = (millis / (1000 * 60)) % 60;
+  uint64_t hours = (millis / (1000 * 60 * 60)) % 24;
 
   char time_str[9];
   sprintf(time_str, "%02d:%02d:%02d", hours, minutes, seconds);
   return String(time_str);
+}
+
+void doBeep() {
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(5);
+  digitalWrite(BUZZER_PIN, LOW);
 }
 
 void IRAM_ATTR watchDogFeed() {

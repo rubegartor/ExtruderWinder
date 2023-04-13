@@ -15,13 +15,15 @@
 #include "soc/timer_group_reg.h"
 #include "soc/timer_group_struct.h"
 
+#define BUZZER_PIN 12
+
 #define DEFAULT_PULLER_SPEED 1500
 #define NAMESPACE "extruder"
 #define FILAMENT_DIAMETER_MODE_PREF "filaDiam"
 #define DEFAULT_FILAMENT_DIAMETER 1.75f
 
 const float spoolMotorRatio = 5.16;
-const uint16_t stepsPerCm = 495;  // Steps to travel 1cm
+const uint16_t stepsPerCm = 510;
 const uint16_t oneRevSpool = 3200 * spoolMotorRatio;
 const uint16_t oneRevPuller = 3200;
 
@@ -49,5 +51,7 @@ void commonsInit();
 bool isReady();
 
 String getTime(unsigned long millis);
+
+void doBeep();
 
 void IRAM_ATTR watchDogFeed();

@@ -26,6 +26,9 @@ void setup() {
 
   Serial.println(F("Starting Serial2..."));
 
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+
   pinMode(SPOOL_CS_PIN, OUTPUT);
   digitalWrite(SPOOL_CS_PIN, HIGH);
 
