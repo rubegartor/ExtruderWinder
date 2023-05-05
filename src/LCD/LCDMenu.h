@@ -7,8 +7,7 @@
 
 #define MENU_OPTIONS_NUMBER 6
 #define MENU_MAX_OPTIONS_SHOWED 4
-
-#define MENU_CONFIG_OPTIONS_NUMBER 3
+#define MENU_CONFIG_OPTIONS_NUMBER 6
 
 #define LCD_ADRRESS 0x27
 #define LCD_BUFFER 20
@@ -25,12 +24,16 @@ enum MenuOption {
 enum ConfigSubMenuOption {
   returnConfigOption,
   statusMeasuringOption,
-  targetDiameterOption
+  polymerOption,
+  targetDiameterOption,
+  minPullerSpeedOption,
+  maxPullerSpeedOption
 };
 
 class LCDMenu {
  private:
   MenuOption selectedOption;
+  bool continueMenu;
 
   bool inSubMenu;
   uint8_t speedOption;
@@ -46,6 +49,8 @@ class LCDMenu {
   void pullerSpeedSubMenu();
 
   void infoSubMenu();
+
+  void resetCountersMenu();
 
   void setSpeedButtonUnderscore();
 

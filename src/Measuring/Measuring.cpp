@@ -22,6 +22,8 @@ float Measuring::read() {
     this->maxRead = this->lastRead;
   }
 
+  wifiOut.put("Extruder", "DiameterReading", (String)this->lastRead);
+
   return this->lastRead;
 }
 
@@ -37,6 +39,8 @@ void Measuring::reset() {
   this->lastRead = 0;
   this->readValueNum = 0;
   this->readValueSum = 0;
+
+  wifiOut.put("Extruder", "Reset");
 }
 
 String Measuring::measuringModeString() {

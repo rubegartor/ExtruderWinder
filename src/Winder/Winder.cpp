@@ -8,9 +8,9 @@ AccelStepper pullerMotor(AccelStepper::DRIVER, PULLER_STEP_PIN, PULLER_DIR_PIN);
 void initWinder() { spoolMotor.setMaxSpeed(SPOOL_MAX_SPEED); }
 
 void IRAM_ATTR winderLoop() {
-  if (homed) {
-    spoolSpeed = pidSpooler.computeSpeed();
+  spoolSpeed = pidSpooler.computeSpeed();
 
+  if (isReady()) {
     spoolMotor.setSpeed(spoolSpeed);
     spoolMotor.runSpeed();
 
@@ -50,4 +50,10 @@ float getExtrudedLength() {
   float value = circ * (float)pullerTotalRevs;
 
   return circ * (float)pullerTotalRevs;
+}
+
+float getExtrudedWeight() { 
+  Polymer actualPolymer = stringToPolymer(pref.getString(SELECTED_POLYMER_PREF, polymers[0].name));
+
+  return getExtrudedLength() * actualPolymer.weight; 
 }

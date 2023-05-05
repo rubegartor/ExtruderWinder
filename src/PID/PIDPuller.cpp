@@ -11,14 +11,30 @@ void PIDPuller::init() {
   pullerPID = pid;
 
   this->setPoint = filamentDiameter;
-  this->minOutput = 950;
-  this->maxOutput = 2200;
+  this->minOutput = pref.getUInt(MIN_PULLER_SPEED_PREF, MIN_PULLER_SPEED_DEFAULT);
+  this->maxOutput = pref.getUInt(MAX_PULLER_SPEED_PREF, MAX_PULLER_SPEED_DEFAULT);
 
   pullerPID.SetMode(AUTOMATIC);
 }
 
+double PIDPuller::getSetPoint() {
+  return this->setPoint;
+}
+
 void PIDPuller::updateSetPoint(float setPoint) {
-  this->setPoint = setPoint;
+  Polymer actualPolymer = stringToPolymer(pref.getString(SELECTED_POLYMER_PREF, polymers[0].name));
+
+  this->setPoint = setPoint - actualPolymer.diameterOffset;
+}
+
+void PIDPuller::updateMinPullerSpeed(uint16_t speed) {
+  pref.putUInt(MIN_PULLER_SPEED_PREF, speed);
+  this->minOutput = speed;
+}
+
+void PIDPuller::updateMaxPullerSpeed(uint16_t speed) {
+  pref.putUInt(MAX_PULLER_SPEED_PREF, speed);
+  this->maxOutput = speed;
 }
 
 uint16_t PIDPuller::computeSpeed() {

@@ -4,6 +4,7 @@
 #include <BlockNot.h>
 #include <Commons/Commons.h>
 #include <LCD/LCDMenu.h>
+#include <Winder/Winder.h>
 
 enum MotorDirEnum { forward, backward };
 
@@ -13,13 +14,14 @@ AccelStepper alignerMotor(AccelStepper::DRIVER, ALIGNER_STEP_PIN,
 BlockNot readDistance(200);
 BlockNot updateSummary(500);
 BlockNot readDiameter(80);
+BlockNot extruderResume(1000);
 
-bool homingAligner = false;
-bool firstMove = false;
+bool homingAligner;
+bool firstMove;
 uint16_t lastTotalRevs = 0;
 
-bool isStartPosSet = false;
-bool isEndPosSet = false;
+bool isStartPosSet;
+bool isEndPosSet;
 int16_t spoolEndPos = 0;
 
 MotorDirEnum motorDir = forward;
@@ -107,6 +109,14 @@ void aTask(void *pvParameters) {
       refreshSummary();
     }
 
+    if (wifiOut.isConnected() && extruderResume.TRIGGERED) {
+      wifiOut.put("Extruder", "ExtrudedLength", (String)getExtrudedLength());
+      wifiOut.put("Extruder", "ExtrudedWeight", (String)getExtrudedWeight());
+      wifiOut.put("Extruder", "Time", (String)(millis() - millisOffset));
+      wifiOut.put("Extruder", "PullerSpeed", (String)pullerSpeed);
+      wifiOut.put("Extruder", "SetPoint", (String)pidPuller.getSetPoint());
+    }
+
     if (needHome && !homingAligner) {
       alignerMotor.setSpeed(1500);
       homed = goToHome();
@@ -192,3 +202,5 @@ void resetSpoolerRevs() {
   lastTotalRevs = 0;
   spoolTotalRevs = 0;
 }
+
+bool isPositioned() { return isStartPosSet && isEndPosSet; }

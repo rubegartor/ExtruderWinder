@@ -5,7 +5,7 @@
 #define SPOOL_DIR_PIN 33
 #define SPOOL_STEP_PIN 32
 #define SPOOL_CS_PIN 15
-#define SPOOL_MAX_SPEED 10000
+#define SPOOL_MAX_SPEED 3500
 
 #define PULLER_DIR_PIN 14  // Not connected
 #define PULLER_STEP_PIN 25
@@ -15,3 +15,5 @@
 void IRAM_ATTR wTask(void* pvParameters);
 
 float getExtrudedLength();
+
+float getExtrudedWeight();

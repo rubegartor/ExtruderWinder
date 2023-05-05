@@ -14,3 +14,5 @@ void aTask(void* pvParameters);
 void resetSpoolerRevs();
 
 int16_t moveStep();
+
+bool isPositioned();

@@ -6,6 +6,12 @@
 #define MAX_PID_PULLER_OUTPUT_LIMIT 255
 #define PID_AGGRESSIVE_GAP 0.5f
 
+#define MIN_PULLER_SPEED_DEFAULT 900
+#define MIN_PULLER_SPEED_PREF "minPullerSpeed"
+
+#define MAX_PULLER_SPEED_DEFAULT 3000
+#define MAX_PULLER_SPEED_PREF "maxPullerSpeed"
+
 class PIDPuller {
  private:
   double setPoint, input, output;
@@ -21,7 +27,13 @@ class PIDPuller {
 
   void init();
 
+  double getSetPoint();
+
   void updateSetPoint(float setPoint);
+
+  void updateMinPullerSpeed(uint16_t speed);
+
+  void updateMaxPullerSpeed(uint16_t speed);
 
   uint16_t computeSpeed();
 };

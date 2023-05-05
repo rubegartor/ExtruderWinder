@@ -31,12 +31,15 @@ const char *optionsStr[MENU_OPTIONS_NUMBER] = {
     "Configuracion     ",  "Reset contadores   ", "Informacion        "};
 
 const char *configOptionsStr[MENU_CONFIG_OPTIONS_NUMBER] = {
-    "Volver al menu     ", "Modo:              ", "Diametro:           "};
+    "Volver al menu     ", "Modo:              ", "Material:          ",
+    "Diametro:          ", "Puller min:        ", "Puller max:        "};
 
 const int speeds[4] = {5, 10, 100, 500};
 const int speedsPositions[4] = {2, 5, 9, 14};  // LCD cursor positions
 
 bool firstChangeIgnored;
+uint8_t lastPolymerSelected = 0;
+bool continueMenu = false;
 
 void LCDMenu::init() {
   lcd.init();
@@ -78,7 +81,7 @@ void LCDMenu::initSummary(bool clear) {
   lcd.print("W");
 
   lcd.setCursor(2, 3);
-  lcd.print(getExtrudedLength() * 2.98);
+  lcd.print(getExtrudedWeight());
   lcd.print("g");
 
   lcd.setCursor(12, 3);
@@ -166,6 +169,21 @@ void LCDMenu::println(String text, uint8_t row, bool clear) {
   lcd.print(text + emptyChars);
 }
 
+void LCDMenu::resetCountersMenu() {
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Resetear contadores?");
+  lcd.setCursor(4, 2);
+  lcd.print("No");
+  lcd.setCursor(14, 2);
+  lcd.print("Si");
+
+  lcd.setCursor(4, 3);
+  lcd.write(byte(3));
+  lcd.write(byte(3));
+}
+
 void LCDMenu::pullerSpeedSubMenu() {
   lcd.clear();
 
@@ -195,24 +213,63 @@ void LCDMenu::pullerSpeedSubMenu() {
 void LCDMenu::configSubMenu(bool clear) {
   if (clear) lcd.clear();
 
-  lcd.setCursor(0, this->configSubMenuOption);
+  uint8_t row = (uint8_t)this->configSubMenuOption;
+
+  if (row >= MENU_MAX_OPTIONS_SHOWED) {
+    row = MENU_MAX_OPTIONS_SHOWED - 1;
+  }
+
+  lcd.setCursor(0, row);
   lcd.write(byte(0));
 
-  for (uint8_t i = 0; i < MENU_CONFIG_OPTIONS_NUMBER; i++) {
+  uint8_t maxOptions = MENU_MAX_OPTIONS_SHOWED;
+  uint8_t menuOverflow = 0;
+
+  if (this->configSubMenuOption >= MENU_MAX_OPTIONS_SHOWED) {
+    menuOverflow = abs(MENU_MAX_OPTIONS_SHOWED - this->configSubMenuOption - 1);
+    maxOptions = MENU_MAX_OPTIONS_SHOWED + menuOverflow;
+  }
+
+  for (uint8_t i = menuOverflow; i < maxOptions; i++) {
     String strOpt = configOptionsStr[i];
 
-    lcd.setCursor(1, i);
+    lcd.setCursor(1, i - menuOverflow);
+
+    String newLine = "";
 
     if (strOpt.startsWith("Modo")) {
-      lcd.print("Modo: " + measuring.measuringModeString());
+      newLine = "Modo: " + measuring.measuringModeString();
+    } else if (strOpt.startsWith("Material")) {
+      newLine = "Material: " +
+                pref.getString(SELECTED_POLYMER_PREF, polymers[0].name);
     } else if (strOpt.startsWith("Diametro")) {
       if (measuring.mode == measuringAutoMode) {
-        lcd.print("Diametro: " + (String)filamentDiameter);
+        newLine = "Diametro: " + (String)filamentDiameter;
       } else {
-        lcd.print("                  ");
+        newLine = "                  ";
+      }
+    } else if (strOpt.startsWith("Puller min")) {
+      if (measuring.mode == measuringAutoMode) {
+        newLine = "Puller min: " + (String)pidPuller.minOutput;
+      } else {
+        newLine = "                  ";
+      }
+    } else if (strOpt.startsWith("Puller max")) {
+      if (measuring.mode == measuringAutoMode) {
+        newLine = "Puller max: " + (String)pidPuller.maxOutput;
+      } else {
+        newLine = "                  ";
       }
     } else {
-      lcd.print(strOpt);
+      newLine = strOpt;
+    }
+
+    lcd.print(newLine);
+
+    // Rellenar con espacios
+    uint8_t fillSpaces = LCD_BUFFER - newLine.length() - 1;
+    for (uint8_t j = 0; j < fillSpaces; j++) {
+      lcd.print(" ");
     }
 
     if (strOpt.startsWith("Volver al menu")) {
@@ -238,7 +295,7 @@ bool LCDMenu::inConfigSubMenuOptions() {
 }
 
 void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
-  // Al establecer el valor de inicio del rotatory encoder se lanza el evento
+  // Al establecer el valor de inicio del encoder se lanza el evento
   // "change" y se necesita ignorarlo la primera vez
   if (!firstChangeIgnored) {
     firstChangeIgnored = true;
@@ -261,6 +318,56 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
 
     lcd.setCursor(11, this->configSubMenuOptionSelected);
     lcd.print(filamentDiameter);
+
+    return;
+  }
+
+  if (this->inConfigSubMenuOptions() &&
+      this->configSubMenuOptionSelected == minPullerSpeedOption) {
+    uint16_t minPullerSpeed =
+        pref.getUInt(MIN_PULLER_SPEED_PREF, MIN_PULLER_SPEED_DEFAULT);
+
+    if (rEncoder.direction == increased) {
+      minPullerSpeed += 1;
+    } else {
+      minPullerSpeed -= 1;
+    }
+
+    pidPuller.updateMinPullerSpeed(minPullerSpeed);
+
+    lcd.setCursor(13, MENU_MAX_OPTIONS_SHOWED - 1);
+    lcd.print(minPullerSpeed);
+
+    // Rellenar con espacios
+    uint8_t fillSpaces = abs(LCD_BUFFER - 13 - log10(minPullerSpeed));
+    for (uint8_t j; j < fillSpaces; j++) {
+      lcd.print(" ");
+    }
+
+    return;
+  }
+
+  if (this->inConfigSubMenuOptions() &&
+      this->configSubMenuOptionSelected == maxPullerSpeedOption) {
+    uint16_t maxPullerSpeed =
+        pref.getUInt(MAX_PULLER_SPEED_PREF, MAX_PULLER_SPEED_DEFAULT);
+
+    if (rEncoder.direction == increased) {
+      maxPullerSpeed += 1;
+    } else {
+      maxPullerSpeed -= 1;
+    }
+
+    pidPuller.updateMaxPullerSpeed(maxPullerSpeed);
+
+    lcd.setCursor(13, MENU_MAX_OPTIONS_SHOWED - 1);
+    lcd.print(maxPullerSpeed);
+
+    // Rellenar con espacios
+    uint8_t fillSpaces = abs(LCD_BUFFER - 13 - log10(maxPullerSpeed));
+    for (uint8_t j; j < fillSpaces; j++) {
+      lcd.print(" ");
+    }
 
     return;
   }
@@ -293,14 +400,32 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
         lcd.setCursor(2, 0);
         lcd.print(pullerSpeedBuffer);
         break;
+      case resetCountersOption:
+        this->continueMenu = rEncoder.direction == increased;
+
+        lcd.setCursor(4, 3);
+        lcd.print("  ");
+        lcd.setCursor(14, 3);
+        lcd.print("  ");
+
+        if (this->continueMenu) {
+          lcd.setCursor(14, 3);
+        } else {
+          lcd.setCursor(4, 3);
+        }
+
+        lcd.write(byte(3));
+        lcd.write(byte(3));
+
+        break;
       case configOption:
         uint8_t omitOptions = 0;
 
         if (measuring.mode == measuringManualMode) {
-          omitOptions = 1;
+          omitOptions = 3;
         }
 
-        for (uint8_t i = 0; i < MENU_CONFIG_OPTIONS_NUMBER - omitOptions; i++) {
+        for (uint8_t i = 0; i < MENU_MAX_OPTIONS_SHOWED; i++) {
           lcd.setCursor(0, i);
           lcd.print(" ");
         }
@@ -372,6 +497,81 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
     return;
   }
 
+  if (this->configSubMenuOption == minPullerSpeedOption) {
+    lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
+
+    if (this->configSubMenuOptionSelected != minPullerSpeedOption) {
+      this->configSubMenuOptionSelected = minPullerSpeedOption;
+      lcd.write(byte(4));
+    } else {
+      this->configSubMenuOptionSelected = returnConfigOption;
+      lcd.write(byte(0));
+    }
+
+    return;
+  }
+
+  if (this->configSubMenuOption == maxPullerSpeedOption) {
+    lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
+
+    if (this->configSubMenuOptionSelected != maxPullerSpeedOption) {
+      this->configSubMenuOptionSelected = maxPullerSpeedOption;
+      lcd.write(byte(4));
+    } else {
+      this->configSubMenuOptionSelected = returnConfigOption;
+      lcd.write(byte(0));
+    }
+
+    return;
+  }
+
+  if (this->configSubMenuOption == polymerOption) {
+    uint8_t polymerIndex = 0;
+    Polymer actualPolymer = stringToPolymer(
+        pref.getString(SELECTED_POLYMER_PREF, polymers[0].name));
+
+    for (uint8_t i = 0; i < POLYMER_NUMBER; i++) {
+      if (actualPolymer.name == polymers[i].name) {
+        polymerIndex = i;
+        break;
+      }
+    }
+
+    if (lastPolymerSelected != POLYMER_NUMBER - 1) {
+      polymerIndex = (polymerIndex + 1) % POLYMER_NUMBER;
+    } else {
+      polymerIndex = 0;
+    }
+
+    lastPolymerSelected = polymerIndex;
+
+    Polymer newSelectedPolymer = polymers[polymerIndex];
+
+    lcd.setCursor(11, 2);
+    lcd.print(newSelectedPolymer.name + "    ");
+
+    pref.putString(SELECTED_POLYMER_PREF, newSelectedPolymer.name);
+
+    return;
+  }
+
+  if (this->inSubMenu && this->menuPosition == resetCountersOption) {
+    if (this->continueMenu) {
+      pullerTotalRevs = 0;
+      millisOffset = millis();
+      resetSpoolerRevs();
+      measuring.reset();
+      this->initSummary(true);
+    } else {
+      this->initMenu((MenuOption)this->menuPosition, true);
+    }
+
+    this->continueMenu = false;
+    this->inSubMenu = false;
+
+    return;
+  }
+
   if (this->inSubMenu) {
     this->configSubMenuOption = 0;
     // -----------------------------------------------------------
@@ -401,11 +601,8 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
         this->pullerSpeedSubMenu();
         break;
       case resetCountersOption:
-        pullerTotalRevs = 0;
-        millisOffset = millis();
-        resetSpoolerRevs();
-        measuring.reset();
-        this->initSummary(true);
+        this->inSubMenu = true;
+        this->resetCountersMenu();
         break;
       case configOption:
         this->inSubMenu = true;
@@ -420,6 +617,8 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
 }
 
 void LCDMenu::setSpeedButtonUnderscore() {
+  if (measuring.mode == measuringAutoMode) return;
+
   lcd.setCursor(0, 3);
   for (uint8_t k = 0; k < LCD_BUFFER; k++) {
     lcd.print(" ");

@@ -11,7 +11,7 @@
 class PIDSpooler {
  private:
   uint16_t lastComputed;
-  double Kp = 3;
+  double Kp = 1.2;
   double Ki = 1.5;
   double Kd = 0.03;
   double setPoint, input, output;
