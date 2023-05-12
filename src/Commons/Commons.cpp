@@ -125,6 +125,14 @@ void doBeep() {
   digitalWrite(BUZZER_PIN, LOW);
 }
 
+float ruleOfThree(float A, float B, float C) {
+  if ((A == 0) || (B == 0)) {
+    return 0;
+  }
+
+  return (B * C) / A;
+}
+
 void IRAM_ATTR watchDogFeed() {
   TIMERG0.wdt_wprotect = TIMG_WDT_WKEY_VALUE;
   TIMERG0.wdt_feed = 1;

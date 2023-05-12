@@ -14,6 +14,9 @@ void PIDPuller::init() {
   this->minOutput = pref.getUInt(MIN_PULLER_SPEED_PREF, MIN_PULLER_SPEED_DEFAULT);
   this->maxOutput = pref.getUInt(MAX_PULLER_SPEED_PREF, MAX_PULLER_SPEED_DEFAULT);
 
+  this->Ki = pref.getDouble(PID_KI_PREF, PID_KI_DEFAULT);
+
+  pullerPID.SetTunings(this->Kp, this->Ki, this->Kd);
   pullerPID.SetMode(AUTOMATIC);
 }
 
@@ -35,6 +38,13 @@ void PIDPuller::updateMinPullerSpeed(uint16_t speed) {
 void PIDPuller::updateMaxPullerSpeed(uint16_t speed) {
   pref.putUInt(MAX_PULLER_SPEED_PREF, speed);
   this->maxOutput = speed;
+}
+
+void PIDPuller::updateKi(double ki) {
+  pref.putDouble(PID_KI_PREF, ki);
+  this->Ki = ki;
+
+  pullerPID.SetTunings(this->Kp, this->Ki, this->Kd);
 }
 
 uint16_t PIDPuller::computeSpeed() {

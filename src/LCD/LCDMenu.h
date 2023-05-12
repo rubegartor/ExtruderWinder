@@ -7,7 +7,7 @@
 
 #define MENU_OPTIONS_NUMBER 6
 #define MENU_MAX_OPTIONS_SHOWED 4
-#define MENU_CONFIG_OPTIONS_NUMBER 6
+#define MENU_CONFIG_OPTIONS_NUMBER 7
 
 #define LCD_ADRRESS 0x27
 #define LCD_BUFFER 20
@@ -27,7 +27,8 @@ enum ConfigSubMenuOption {
   polymerOption,
   targetDiameterOption,
   minPullerSpeedOption,
-  maxPullerSpeedOption
+  maxPullerSpeedOption,
+  pidKiOption
 };
 
 class LCDMenu {
@@ -50,7 +51,7 @@ class LCDMenu {
 
   void infoSubMenu();
 
-  void resetCountersMenu();
+  void confirmationMenu(String message);
 
   void setSpeedButtonUnderscore();
 

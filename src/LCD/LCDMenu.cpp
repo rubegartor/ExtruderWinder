@@ -32,7 +32,8 @@ const char *optionsStr[MENU_OPTIONS_NUMBER] = {
 
 const char *configOptionsStr[MENU_CONFIG_OPTIONS_NUMBER] = {
     "Volver al menu     ", "Modo:              ", "Material:          ",
-    "Diametro:          ", "Puller min:        ", "Puller max:        "};
+    "Diametro:          ", "Puller min:        ", "Puller max:        ",
+    "Ki:                "};
 
 const int speeds[4] = {5, 10, 100, 500};
 const int speedsPositions[4] = {2, 5, 9, 14};  // LCD cursor positions
@@ -169,11 +170,11 @@ void LCDMenu::println(String text, uint8_t row, bool clear) {
   lcd.print(text + emptyChars);
 }
 
-void LCDMenu::resetCountersMenu() {
+void LCDMenu::confirmationMenu(String message) {
   lcd.clear();
 
   lcd.setCursor(0, 0);
-  lcd.print("Resetear contadores?");
+  lcd.print(message);
   lcd.setCursor(4, 2);
   lcd.print("No");
   lcd.setCursor(14, 2);
@@ -260,6 +261,12 @@ void LCDMenu::configSubMenu(bool clear) {
       } else {
         newLine = "                  ";
       }
+    } else if (strOpt.startsWith("Ki")) {
+      if (measuring.mode == measuringAutoMode) {
+        newLine = "Ki: " + (String)pref.getDouble(PID_KI_PREF, PID_KI_DEFAULT);
+      } else {
+        newLine = "                  ";
+      }
     } else {
       newLine = strOpt;
     }
@@ -282,11 +289,8 @@ void LCDMenu::configSubMenu(bool clear) {
 void LCDMenu::infoSubMenu() {
   lcd.clear();
 
-  String ipAddr = wifiOut.ipAddr;
-  ipAddr = ipAddr.isEmpty() ? "Sin conexion" : ipAddr;
-
   lcd.setCursor(0, 0);
-  lcd.print("IP: " + ipAddr);
+  lcd.print("IP: " + wifiOut.isConnected() ? wifiOut.ipAddr : "Sin conexion");
 }
 
 bool LCDMenu::inConfigSubMenuOptions() {
@@ -306,11 +310,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
 
   if (this->inConfigSubMenuOptions() &&
       this->configSubMenuOptionSelected == targetDiameterOption) {
-    if (rEncoder.direction == increased) {
-      filamentDiameter += 0.01f;
-    } else {
-      filamentDiameter -= 0.01f;
-    }
+    filamentDiameter += (rEncoder.direction == increased) ? 0.01f : -0.01f;
 
     // Guardar el último diametro de filamento seleccionado
     pref.putFloat(FILAMENT_DIAMETER_MODE_PREF, filamentDiameter);
@@ -327,11 +327,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
     uint16_t minPullerSpeed =
         pref.getUInt(MIN_PULLER_SPEED_PREF, MIN_PULLER_SPEED_DEFAULT);
 
-    if (rEncoder.direction == increased) {
-      minPullerSpeed += 1;
-    } else {
-      minPullerSpeed -= 1;
-    }
+    minPullerSpeed += (rEncoder.direction == increased) ? 1 : -1;
 
     pidPuller.updateMinPullerSpeed(minPullerSpeed);
 
@@ -352,11 +348,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
     uint16_t maxPullerSpeed =
         pref.getUInt(MAX_PULLER_SPEED_PREF, MAX_PULLER_SPEED_DEFAULT);
 
-    if (rEncoder.direction == increased) {
-      maxPullerSpeed += 1;
-    } else {
-      maxPullerSpeed -= 1;
-    }
+    maxPullerSpeed += (rEncoder.direction == increased) ? 1 : -1;
 
     pidPuller.updateMaxPullerSpeed(maxPullerSpeed);
 
@@ -365,6 +357,26 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
 
     // Rellenar con espacios
     uint8_t fillSpaces = abs(LCD_BUFFER - 13 - log10(maxPullerSpeed));
+    for (uint8_t j; j < fillSpaces; j++) {
+      lcd.print(" ");
+    }
+
+    return;
+  }
+
+  if (this->inConfigSubMenuOptions() &&
+      this->configSubMenuOptionSelected == pidKiOption) {
+    double Ki = pref.getDouble(PID_KI_PREF, PID_KI_DEFAULT);
+
+    Ki += (rEncoder.direction == increased) ? 0.01f : -0.01f;
+
+    pidPuller.updateKi(Ki);
+
+    lcd.setCursor(5, MENU_MAX_OPTIONS_SHOWED - 1);
+    lcd.print(Ki);
+
+    // Rellenar con espacios
+    uint8_t fillSpaces = LCD_BUFFER - 5 - ((String)Ki).length();
     for (uint8_t j; j < fillSpaces; j++) {
       lcd.print(" ");
     }
@@ -401,6 +413,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
         lcd.print(pullerSpeedBuffer);
         break;
       case resetCountersOption:
+      case homeAlignerOption:
         this->continueMenu = rEncoder.direction == increased;
 
         lcd.setCursor(4, 3);
@@ -422,7 +435,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
         uint8_t omitOptions = 0;
 
         if (measuring.mode == measuringManualMode) {
-          omitOptions = 3;
+          omitOptions = 4;
         }
 
         for (uint8_t i = 0; i < MENU_MAX_OPTIONS_SHOWED; i++) {
@@ -525,6 +538,20 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
     return;
   }
 
+  if (this->configSubMenuOption == pidKiOption) {
+    lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
+
+    if (this->configSubMenuOptionSelected != pidKiOption) {
+      this->configSubMenuOptionSelected = pidKiOption;
+      lcd.write(byte(4));
+    } else {
+      this->configSubMenuOptionSelected = returnConfigOption;
+      lcd.write(byte(0));
+    }
+
+    return;
+  }
+
   if (this->configSubMenuOption == polymerOption) {
     uint8_t polymerIndex = 0;
     Polymer actualPolymer = stringToPolymer(
@@ -572,6 +599,23 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
     return;
   }
 
+  if (this->inSubMenu && this->menuPosition == homeAlignerOption) {
+    if (this->continueMenu) {
+      lcd.clear();
+      lcd.setCursor(2, 1);
+      lcd.print("Posicionando ...");
+
+      needHome = true;
+    } else {
+      this->initMenu((MenuOption)this->menuPosition, true);
+    }
+
+    this->continueMenu = false;
+    this->inSubMenu = false;
+
+    return;
+  }
+
   if (this->inSubMenu) {
     this->configSubMenuOption = 0;
     // -----------------------------------------------------------
@@ -590,11 +634,16 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
         this->initSummary(true);
         break;
       case homeAlignerOption:
-        needHome = true;
+        if (isPositioned()) {
+          this->inSubMenu = true;
+          this->confirmationMenu("Posicionar de nuevo?");
+        } else {
+          needHome = true;
 
-        lcd.clear();
-        lcd.setCursor(2, 1);
-        lcd.print("Posicionando ...");
+          lcd.clear();
+          lcd.setCursor(2, 1);
+          lcd.print("Posicionando ...");
+        }
         break;
       case pullerSpeedOption:
         this->inSubMenu = true;
@@ -602,7 +651,7 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
         break;
       case resetCountersOption:
         this->inSubMenu = true;
-        this->resetCountersMenu();
+        this->confirmationMenu("Resetear contadores?");
         break;
       case configOption:
         this->inSubMenu = true;

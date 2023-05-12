@@ -52,8 +52,8 @@ float getExtrudedLength() {
   return circ * (float)pullerTotalRevs;
 }
 
-float getExtrudedWeight() { 
+float getExtrudedWeight() {
   Polymer actualPolymer = stringToPolymer(pref.getString(SELECTED_POLYMER_PREF, polymers[0].name));
 
-  return getExtrudedLength() * actualPolymer.weight; 
+  return getExtrudedLength() * ruleOfThree(DEFAULT_FILAMENT_DIAMETER, actualPolymer.weight, filamentDiameter); 
 }
