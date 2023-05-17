@@ -48,7 +48,7 @@ void setup() {
   driverSpool.begin();              // Initiate pins and registers
   driverSpool.toff(4);              // off time
   driverSpool.blank_time(24);       // blank time
-  driverSpool.rms_current(650);     // 650mAh RMS
+  driverSpool.rms_current(750);     // 750mAh RMS
   driverSpool.microsteps(4);        // 4 microsteps
   driverSpool.en_pwm_mode(true);    // Enable StealthChop
   driverSpool.pwm_autoscale(true);  // StealthChop

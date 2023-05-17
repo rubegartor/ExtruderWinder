@@ -8,16 +8,24 @@ void PIDPuller::init() {
   PID pid(&this->input, &this->output, &this->setPoint, this->Kp, this->Ki,
           this->Kd, DIRECT);
 
+  this->activated = true;
+
   pullerPID = pid;
 
   this->setPoint = filamentDiameter;
   this->minOutput = pref.getUInt(MIN_PULLER_SPEED_PREF, MIN_PULLER_SPEED_DEFAULT);
   this->maxOutput = pref.getUInt(MAX_PULLER_SPEED_PREF, MAX_PULLER_SPEED_DEFAULT);
 
-  this->Ki = pref.getDouble(PID_KI_PREF, PID_KI_DEFAULT);
-
   pullerPID.SetTunings(this->Kp, this->Ki, this->Kd);
   pullerPID.SetMode(AUTOMATIC);
+}
+
+bool PIDPuller::inAutoStop() {
+  return !this->activated;
+}
+
+void PIDPuller::emergencyStop() {
+  this->activated = false;
 }
 
 double PIDPuller::getSetPoint() {
@@ -40,13 +48,6 @@ void PIDPuller::updateMaxPullerSpeed(uint16_t speed) {
   this->maxOutput = speed;
 }
 
-void PIDPuller::updateKi(double ki) {
-  pref.putDouble(PID_KI_PREF, ki);
-  this->Ki = ki;
-
-  pullerPID.SetTunings(this->Kp, this->Ki, this->Kd);
-}
-
 uint16_t PIDPuller::computeSpeed() {
   this->input = measuring.lastRead;
 
@@ -64,6 +65,11 @@ uint16_t PIDPuller::computeSpeed() {
 }
 
 void PIDPuller::doCompute(float input) {
+  if (!this->activated) {
+    this->lastComputed = 0;
+    return;
+  }
+
   pullerPID.Compute();
 
   this->lastComputed =

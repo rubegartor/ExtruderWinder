@@ -32,8 +32,8 @@ const char *optionsStr[MENU_OPTIONS_NUMBER] = {
 
 const char *configOptionsStr[MENU_CONFIG_OPTIONS_NUMBER] = {
     "Volver al menu     ", "Modo:              ", "Material:          ",
-    "Diametro:          ", "Puller min:        ", "Puller max:        ",
-    "Ki:                "};
+    "Auto stop:         ", "Diametro:          ", "Puller min:        ",
+    "Puller max:        "};
 
 const int speeds[4] = {5, 10, 100, 500};
 const int speedsPositions[4] = {2, 5, 9, 14};  // LCD cursor positions
@@ -261,9 +261,11 @@ void LCDMenu::configSubMenu(bool clear) {
       } else {
         newLine = "                  ";
       }
-    } else if (strOpt.startsWith("Ki")) {
+    } else if (strOpt.startsWith("Auto stop")) {
       if (measuring.mode == measuringAutoMode) {
-        newLine = "Ki: " + (String)pref.getDouble(PID_KI_PREF, PID_KI_DEFAULT);
+        newLine =
+            "Auto stop: " + (String)pref.getFloat(AUTOSTOP_THRESHOLD_PREF,
+                                                  AUTOSTOP_THRESHOLD_DEFAULT);
       } else {
         newLine = "                  ";
       }
@@ -316,7 +318,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
     pref.putFloat(FILAMENT_DIAMETER_MODE_PREF, filamentDiameter);
     pidPuller.updateSetPoint(filamentDiameter);
 
-    lcd.setCursor(11, this->configSubMenuOptionSelected);
+    lcd.setCursor(11, MENU_MAX_OPTIONS_SHOWED - 1);
     lcd.print(filamentDiameter);
 
     return;
@@ -365,18 +367,19 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
   }
 
   if (this->inConfigSubMenuOptions() &&
-      this->configSubMenuOptionSelected == pidKiOption) {
-    double Ki = pref.getDouble(PID_KI_PREF, PID_KI_DEFAULT);
+      this->configSubMenuOptionSelected == autoStopOption) {
+    float autoStop =
+        pref.getFloat(AUTOSTOP_THRESHOLD_PREF, AUTOSTOP_THRESHOLD_DEFAULT);
 
-    Ki += (rEncoder.direction == increased) ? 0.01f : -0.01f;
+    autoStop += (rEncoder.direction == increased) ? 0.01f : -0.01f;
 
-    pidPuller.updateKi(Ki);
+    pref.putFloat(AUTOSTOP_THRESHOLD_PREF, autoStop);
 
-    lcd.setCursor(5, MENU_MAX_OPTIONS_SHOWED - 1);
-    lcd.print(Ki);
+    lcd.setCursor(12, MENU_MAX_OPTIONS_SHOWED - 1);
+    lcd.print(autoStop);
 
     // Rellenar con espacios
-    uint8_t fillSpaces = LCD_BUFFER - 5 - ((String)Ki).length();
+    uint8_t fillSpaces = LCD_BUFFER - 12 - ((String)autoStop).length();
     for (uint8_t j; j < fillSpaces; j++) {
       lcd.print(" ");
     }
@@ -497,7 +500,7 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
   }
 
   if (this->configSubMenuOption == targetDiameterOption) {
-    lcd.setCursor(0, (uint8_t)targetDiameterOption);
+    lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
 
     if (this->configSubMenuOptionSelected != targetDiameterOption) {
       this->configSubMenuOptionSelected = targetDiameterOption;
@@ -538,11 +541,11 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
     return;
   }
 
-  if (this->configSubMenuOption == pidKiOption) {
+  if (this->configSubMenuOption == autoStopOption) {
     lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
 
-    if (this->configSubMenuOptionSelected != pidKiOption) {
-      this->configSubMenuOptionSelected = pidKiOption;
+    if (this->configSubMenuOptionSelected != autoStopOption) {
+      this->configSubMenuOptionSelected = autoStopOption;
       lcd.write(byte(4));
     } else {
       this->configSubMenuOptionSelected = returnConfigOption;

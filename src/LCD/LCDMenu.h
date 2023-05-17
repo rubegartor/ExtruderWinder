@@ -25,10 +25,10 @@ enum ConfigSubMenuOption {
   returnConfigOption,
   statusMeasuringOption,
   polymerOption,
+  autoStopOption,
   targetDiameterOption,
   minPullerSpeedOption,
-  maxPullerSpeedOption,
-  pidKiOption
+  maxPullerSpeedOption
 };
 
 class LCDMenu {

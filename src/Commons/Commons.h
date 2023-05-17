@@ -73,6 +73,8 @@ String getTime(unsigned long millis);
 
 void doBeep();
 
+void doAlarm();
+
 float ruleOfThree(float A, float B, float X);
 
 void IRAM_ATTR watchDogFeed();

@@ -12,14 +12,12 @@
 #define MAX_PULLER_SPEED_DEFAULT 3000
 #define MAX_PULLER_SPEED_PREF "maxPullerSpeed"
 
-#define PID_KI_PREF "pullerPID_Ki"
-#define PID_KI_DEFAULT 12.5
-
 class PIDPuller {
  private:
+  bool activated;
   double setPoint, input, output;
   double aggKp = 5, aggKi = 25, aggKd = 0.05;
-  double Kp = 2, Ki = PID_KI_DEFAULT, Kd = 1;
+  double Kp = 2, Ki = 12.5, Kd = 1;
   uint16_t lastComputed;
 
   void doCompute(float input);
@@ -30,6 +28,10 @@ class PIDPuller {
 
   void init();
 
+  bool inAutoStop();
+
+  void emergencyStop();
+
   double getSetPoint();
 
   void updateSetPoint(float setPoint);
@@ -37,8 +39,6 @@ class PIDPuller {
   void updateMinPullerSpeed(uint16_t speed);
 
   void updateMaxPullerSpeed(uint16_t speed);
-
-  void updateKi(double ki);
 
   uint16_t computeSpeed();
 };

@@ -38,6 +38,8 @@ void IRAM_ATTR wTask(void* pvParameters) {
   initPuller();
 
   for (;;) {
+    if (pidPuller.inAutoStop()) doAlarm();
+
     pullerLoop();
     winderLoop();
 

@@ -120,9 +120,18 @@ String getTime(unsigned long millis) {
 }
 
 void doBeep() {
+  if (pidPuller.inAutoStop()) return;
+
   digitalWrite(BUZZER_PIN, HIGH);
   delay(5);
   digitalWrite(BUZZER_PIN, LOW);
+}
+
+void doAlarm() {
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(250);
+  digitalWrite(BUZZER_PIN, LOW);
+  delay(250);
 }
 
 float ruleOfThree(float A, float B, float C) {
