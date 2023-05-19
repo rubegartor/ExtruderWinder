@@ -24,13 +24,15 @@ float Measuring::read() {
 
   wifiOut.put("Extruder", "DiameterReading", (String)this->lastRead);
 
-  float autoStopThr =
-      pref.getFloat(AUTOSTOP_THRESHOLD_PREF, AUTOSTOP_THRESHOLD_DEFAULT);
+  if (this->mode == measuringAutoMode) {
+    float autoStopThr =
+        pref.getFloat(AUTOSTOP_THRESHOLD_PREF, AUTOSTOP_THRESHOLD_DEFAULT);
 
-  double gap = abs(pidPuller.getSetPoint() - this->lastRead);
+    double gap = abs(pidPuller.getSetPoint() - this->lastRead);
 
-  if (this->autoStopEnabled && gap > autoStopThr) {
-    pidPuller.emergencyStop();
+    if (this->autoStopEnabled && gap > autoStopThr) {
+      pidPuller.emergencyStop();
+    }
   }
 
   return this->lastRead;
@@ -48,11 +50,7 @@ void Measuring::reset() {
   double gap =
       abs(pidPuller.getSetPoint() - this->lastRead) - pidPuller.getSetPoint();
 
-  if (abs(gap) > AUTOSTOP_ENABLE_THRESHOLD) {
-    this->autoStopEnabled = true;
-  } else {
-    this->autoStopEnabled = false;
-  }
+  this->autoStopEnabled = abs(gap) > AUTOSTOP_ENABLE_THRESHOLD;
 
   this->minRead = this->lastRead;
   this->maxRead = this->lastRead;
