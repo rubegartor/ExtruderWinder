@@ -139,10 +139,10 @@ void LCDMenu::initMenu(MenuOption option, bool clear) {
     lcd.setCursor(1, j - menuOverflow);
     lcd.print(strOpt);
 
-    if (strOpt.startsWith("Posicionar") && homed) {
+    if (strOpt.startsWith("Posicionar") && isPositioned()) {
       lcd.write(byte(1));
       lcd.print("]     ");
-    } else if (strOpt.startsWith("Posicionar") && !homed) {
+    } else if (strOpt.startsWith("Posicionar") && !isPositioned()) {
       lcd.write(byte(5));
       lcd.print("]     ");
     }
@@ -292,7 +292,11 @@ void LCDMenu::infoSubMenu() {
   lcd.clear();
 
   lcd.setCursor(0, 0);
-  lcd.print("IP: " + wifiOut.isConnected() ? wifiOut.ipAddr : "Sin conexion");
+  if (wifiOut.isConnected()) {
+    lcd.print("IP: " + wifiOut.ipAddr);
+  } else {
+    lcd.print("IP: Sin conexion");
+  }
 }
 
 bool LCDMenu::inConfigSubMenuOptions() {
@@ -604,11 +608,8 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
 
   if (this->inSubMenu && this->menuPosition == homeAlignerOption) {
     if (this->continueMenu) {
-      lcd.clear();
-      lcd.setCursor(2, 1);
-      lcd.print("Posicionando ...");
-
-      needHome = true;
+      resetHome();
+      startAlignerPosition();
     } else {
       this->initMenu((MenuOption)this->menuPosition, true);
     }
@@ -641,11 +642,7 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
           this->inSubMenu = true;
           this->confirmationMenu("Posicionar de nuevo?");
         } else {
-          needHome = true;
-
-          lcd.clear();
-          lcd.setCursor(2, 1);
-          lcd.print("Posicionando ...");
+          startAlignerPosition();
         }
         break;
       case pullerSpeedOption:

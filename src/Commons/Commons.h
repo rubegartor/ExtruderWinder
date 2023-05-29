@@ -15,6 +15,9 @@
 #include "soc/timer_group_reg.h"
 #include "soc/timer_group_struct.h"
 
+#define R_SENSE 0.11f  // TMC2130
+#define STALLGUARD_SENSITIVITY 5
+
 #define BUZZER_PIN 12
 
 #define STEPPER_DEF_STEPS 200
@@ -51,8 +54,6 @@ struct Polymer {
                          // para calcularlo)
 };
 
-extern bool homed;
-extern bool needHome;
 extern uint16_t spoolTotalRevs;
 extern uint16_t pullerTotalRevs;
 extern uint16_t spoolSpeed;
@@ -62,8 +63,6 @@ extern ulong millisOffset;
 extern Polymer polymers[POLYMER_NUMBER];
 
 void commonsInit();
-
-bool isHomed();
 
 bool isReady();
 

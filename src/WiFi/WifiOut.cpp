@@ -49,9 +49,11 @@ void WifiOut::receive() {
     String read = Serial.readStringUntil('\n');
     read.trim();
 
-    String arr[3];
-    _splitString(read, ',', arr, 3);
+    if (read.length() > 0) {
+      String arr[3];
+      _splitString(read, ',', arr, 3);
 
-    if (arr[0] == "WiFi") this->processWifiMessages(arr[1], arr[2]);
+      if (arr[0] == "WiFi") this->processWifiMessages(arr[1], arr[2]);
+    }
   }
 }

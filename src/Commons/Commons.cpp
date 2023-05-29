@@ -31,8 +31,6 @@ Polymer PETG;
 Polymer PCABS;
 Polymer OTHER;
 
-bool homed;
-bool needHome;
 uint16_t spoolTotalRevs;
 uint16_t pullerTotalRevs;
 uint16_t spoolSpeed = 0;
@@ -104,8 +102,6 @@ void commonsInit() {
 
   pidPuller.updateSetPoint(filamentDiameter);
 }
-
-bool isHomed() { return homed && !needHome; }
 
 bool isReady() { return isHomed() && isPositioned(); }
 

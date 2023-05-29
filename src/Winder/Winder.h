@@ -12,6 +12,8 @@
 #define PULLER_MAX_SPEED 13200
 #define PULLER_DIAM 24.5f  // In mm
 
+void configSpoolDriver();
+
 void IRAM_ATTR wTask(void* pvParameters);
 
 float getExtrudedLength();

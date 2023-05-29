@@ -1,15 +1,9 @@
 #include <Aligner/Aligner.h>
 #include <Arduino.h>
+#include <BlockNot.h>
 #include <Commons/Commons.h>
-#include <TMCStepper.h>
+#include <SPI.h>
 #include <Winder/Winder.h>
-
-#define R_SENSE 0.11f  // TMC2130
-
-TMC2130Stepper driverAligner = TMC2130Stepper(ALIGNER_CS_PIN, R_SENSE);
-TMC2130Stepper driverSpool = TMC2130Stepper(SPOOL_CS_PIN, R_SENSE);
-
-using namespace TMC2130_n;
 
 TaskHandle_t winderTask;
 TaskHandle_t alignerTask;
@@ -39,19 +33,9 @@ void setup() {
 
   pinMode(MISO, INPUT_PULLUP);
 
-  driverAligner.begin();           // Initiate pins and registers
-  driverAligner.toff(4);           // off time
-  driverAligner.blank_time(24);    // blank time
-  driverAligner.rms_current(400);  // 400mAh RMS
-  driverAligner.microsteps(2);     // 2 microsteps
+  configAlignerDriver();
 
-  driverSpool.begin();              // Initiate pins and registers
-  driverSpool.toff(4);              // off time
-  driverSpool.blank_time(24);       // blank time
-  driverSpool.rms_current(850);     // 850mAh RMS
-  driverSpool.microsteps(4);        // 4 microsteps
-  driverSpool.en_pwm_mode(true);    // Enable StealthChop
-  driverSpool.pwm_autoscale(true);  // StealthChop
+  configSpoolDriver();
 
   pinMode(SPOOL_DIR_PIN, OUTPUT);
   pinMode(SPOOL_STEP_PIN, OUTPUT);
@@ -82,8 +66,6 @@ void setup() {
   pidPuller.init();
 
   pidSpooler.init();
-
-  pinMode(ALIGNER_HOME_SENSOR_PIN, INPUT_PULLUP);
 
   xTaskCreatePinnedToCore(
       wTask,       /* Task function. */

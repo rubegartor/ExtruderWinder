@@ -4,39 +4,71 @@
 #include <BlockNot.h>
 #include <Commons/Commons.h>
 #include <LCD/LCDMenu.h>
+#include <TMCStepper.h>
 #include <Winder/Winder.h>
 
+using namespace TMC2130_n;
+
 enum MotorDirEnum { forward, backward };
+
+enum AlignerStatus { alignerNoStatus, alignerStart, alignerPositioned };
+
+TMC2130Stepper driverAligner = TMC2130Stepper(ALIGNER_CS_PIN, R_SENSE);
 
 AccelStepper alignerMotor(AccelStepper::DRIVER, ALIGNER_STEP_PIN,
                           ALIGNER_DIR_PIN);
 
+BlockNot homeTimer(5);
 BlockNot readDistance(200);
 BlockNot updateSummary(500);
 BlockNot readDiameter(80);
 BlockNot extruderResume(1000);
 
-bool homingAligner;
-bool firstMove;
+bool homed;
+AlignerStatus alignerActualStatus = alignerNoStatus;
+uint8_t ignoreStallNum;
+
 uint16_t lastTotalRevs = 0;
 
+bool startPosMessageShowed;
 bool isStartPosSet;
 bool isEndPosSet;
 int16_t spoolEndPos = 0;
 
 MotorDirEnum motorDir = forward;
 
-bool goToHome() {
-  bool homeSensor = digitalRead(ALIGNER_HOME_SENSOR_PIN);
-
-  if (homeSensor == LOW) {
-    alignerMotor.runSpeed();
-  }
-
-  return homeSensor;
+void configAlignerDriver() {
+  driverAligner.begin();             // Initiate pins and registers
+  driverAligner.toff(4);             // off time
+  driverAligner.blank_time(24);      // blank time
+  driverAligner.rms_current(400);    // 400mAh RMS
+  driverAligner.microsteps(2);       // 2 microsteps
+  driverAligner.TCOOLTHRS(0xFFFFF);  // 20bit max
+  driverAligner.THIGH(0);
+  driverAligner.semin(5);
+  driverAligner.semax(2);
+  driverAligner.sedn(0b01);
+  driverAligner.sgt(STALLGUARD_SENSITIVITY);
 }
 
-int16_t moveStep() {
+void startAlignerPosition() {
+  isStartPosSet = false;
+  isEndPosSet = false;
+  startPosMessageShowed = false;
+  spoolEndPos = 0;
+  alignerActualStatus = alignerStart;
+}
+
+void resetHome() {
+  homed = false;
+  ignoreStallNum = 0;
+}
+
+/**
+ * Método que mueve el alineador "un paso" para seleccionar el inicio y fin,
+ * establece la dirección segun incremente o decrezca el rotary encoder
+ */
+int16_t _moveStep() {
   int steps = stepsPerCm * (filamentDiameter / 10);
 
   if (rotaryEncoder.direction == increased) {
@@ -50,7 +82,11 @@ int16_t moveStep() {
   return alignerMotor.currentPosition();
 }
 
-void moveAligner() {
+/**
+ * Método que mueve el alineador automaticamente cuando se completa una
+ * revolucion del winder, corrige automaticamente la dirección
+ */
+void _moveAligner() {
   int stepsToGo = -(stepsPerCm * (filamentDiameter / 10));
 
   if (motorDir == backward) {
@@ -67,15 +103,94 @@ void moveAligner() {
     motorDir = backward;
   }
 
-  // 0 is always start position of spool
+  // 0 es siempre la posicion iniciar del alineador
   if (alignerMotor.currentPosition() >= 0) {
     motorDir = forward;
   }
 }
 
-void refreshSummary() {
+void _refreshSummary() {
   if (lcdMenu.inSummary) {
     lcdMenu.initSummary();
+  }
+}
+
+uint16_t _getStallValue() {
+  DRV_STATUS_t drv_status{0};
+  drv_status.sr = driverAligner.DRV_STATUS();
+
+  return drv_status.sg_result;
+}
+
+void _homeProcess() {
+  if (homeTimer.TRIGGERED && !homed) {
+    alignerMotor.setSpeed(1500);
+
+    if (ignoreStallNum < STALLGUARD_IGNORE) {
+      ignoreStallNum++;
+    } else {
+      if (_getStallValue() < STALLGUARD_THRESHOLD) {
+        homed = true;
+      }
+    }
+  }
+
+  if (!homed) {
+    alignerMotor.runSpeed();
+  }
+}
+
+void _LCDActions() {
+  if (rotaryEncoder.changed()) {
+    lcdMenu.onREncoderChange(rotaryEncoder);
+  }
+
+  if (rotaryEncoder.clicked()) {
+    lcdMenu.onREncoderClick(rotaryEncoder);
+  }
+}
+
+void _wifiOutSender() {
+  if (wifiOut.isConnected()) {
+    wifiOut.put("Extruder", "ExtrudedLength", (String)getExtrudedLength());
+    wifiOut.put("Extruder", "ExtrudedWeight", (String)getExtrudedWeight());
+    wifiOut.put("Extruder", "Time", (String)(millis() - millisOffset));
+    wifiOut.put("Extruder", "PullerSpeed", (String)pullerSpeed);
+    wifiOut.put("Extruder", "SetPoint", (String)pidPuller.getSetPoint());
+  }
+}
+
+void _positionAligner() {
+  if (!isStartPosSet) {
+    if (rotaryEncoder.changed()) {
+      _moveStep();
+    }
+
+    if (rotaryEncoder.clicked()) {
+      alignerMotor.setCurrentPosition(0);
+      isStartPosSet = true;
+
+      lcdMenu.println(" Elige el final de", 1, true);
+      lcdMenu.println("     la bobina", 2);
+    }
+  }
+
+  if (isStartPosSet && !isEndPosSet) {
+    if (rotaryEncoder.changed()) {
+      _moveStep();
+    }
+
+    if (rotaryEncoder.clicked()) {
+      isEndPosSet = true;
+      spoolEndPos = alignerMotor.currentPosition();
+
+      alignerMotor.setSpeed(1000);
+      alignerMotor.runToNewPosition(0);
+
+      alignerActualStatus = alignerPositioned;
+
+      lcdMenu.initSummary(true);
+    }
   }
 }
 
@@ -83,114 +198,56 @@ void aTask(void *pvParameters) {
   alignerMotor.setMaxSpeed(ALIGNER_MAX_SPEED);
   alignerMotor.setSpeed(1500);
 
-  lcdMenu.initSummary(true);
-
   for (;;) {
+    _homeProcess();
+
+    // ------------------------------------------
+
     wifiOut.receive();
-
-    if (!firstMove) {
-      alignerMotor.setSpeed(2000);
-      alignerMotor.setAcceleration(20000);
-
-      alignerMotor.runToNewPosition(ALIGNER_FIRST_MOVE);
-
-      firstMove = true;
-    }
-
-    if (readDiameter.TRIGGERED) {
-      measuring.read();
-    }
 
     if (measuring.mode == measuringAutoMode) {
       pullerSpeed = pidPuller.computeSpeed();
     }
 
-    if (updateSummary.TRIGGERED) {
-      refreshSummary();
+    if (alignerActualStatus != alignerStart) {
+      if (isHomed()) {
+        _LCDActions();
+      }
+
+      if (isHomed() && updateSummary.TRIGGERED) {
+        _refreshSummary();
+      }
+
+      if (isHomed() && extruderResume.TRIGGERED) {
+        _wifiOutSender();
+      }
     }
 
-    if (wifiOut.isConnected() && extruderResume.TRIGGERED) {
-      wifiOut.put("Extruder", "ExtrudedLength", (String)getExtrudedLength());
-      wifiOut.put("Extruder", "ExtrudedWeight", (String)getExtrudedWeight());
-      wifiOut.put("Extruder", "Time", (String)(millis() - millisOffset));
-      wifiOut.put("Extruder", "PullerSpeed", (String)pullerSpeed);
-      wifiOut.put("Extruder", "SetPoint", (String)pidPuller.getSetPoint());
-    }
-
-    if (needHome && !homingAligner) {
-      alignerMotor.setSpeed(1500);
-      homed = goToHome();
-      needHome = !homed;
-
-      if (homed) {
+    if (isHomed() && alignerActualStatus == alignerStart && !isPositioned()) {
+      if (!startPosMessageShowed) {
         lcdMenu.println("Elige el comienzo de", 1, true);
         lcdMenu.println("     la bobina", 2);
 
-        isStartPosSet = false;
-        isEndPosSet = false;
-        spoolEndPos = 0;
-        homingAligner = true;
+        startPosMessageShowed = true;
       }
+
+      _positionAligner();
     }
 
-    if (!needHome && homed && homingAligner) {
-      if (!isStartPosSet) {
-        if (rotaryEncoder.changed()) {
-          moveStep();
-        }
-
-        if (rotaryEncoder.clicked()) {
-          alignerMotor.setCurrentPosition(0);
-          isStartPosSet = true;
-
-          lcdMenu.println(" Elige el final de", 1, true);
-          lcdMenu.println("     la bobina", 2);
-        }
-      }
-
-      if (isStartPosSet && !isEndPosSet) {
-        if (rotaryEncoder.changed()) {
-          moveStep();
-        }
-
-        if (rotaryEncoder.clicked()) {
-          isEndPosSet = true;
-          spoolEndPos = alignerMotor.currentPosition();
-
-          alignerMotor.setSpeed(1000);
-          alignerMotor.runToNewPosition(0);
-
-          homingAligner = false;
-
-          lcdMenu.initSummary(true);
-        }
-      }
-    }
-
-    if (!homingAligner) {
+    if (isReady()) {
       // Cuando se haya completado una revolución de la bobina se debe mover el
       // alineador
       if (spoolTotalRevs != lastTotalRevs) {
         lastTotalRevs = spoolTotalRevs;
-        moveAligner();
+        _moveAligner();
       }
 
       if (lcdMenu.menuPosition == pullerSpeedOption) {
         lcdMenu.checkLCDButtons();
       }
 
-      if (homed && isEndPosSet) {
-        if (readDistance.TRIGGERED) {
-          tensioner.getDistance();
-        }
-      }
-
-      if (rotaryEncoder.changed()) {
-        lcdMenu.onREncoderChange(rotaryEncoder);
-      }
-
-      if (rotaryEncoder.clicked()) {
-        lcdMenu.onREncoderClick(rotaryEncoder);
+      if (readDistance.TRIGGERED) {
+        tensioner.getDistance();
       }
     }
 
@@ -202,5 +259,7 @@ void resetSpoolerRevs() {
   lastTotalRevs = 0;
   spoolTotalRevs = 0;
 }
+
+bool isHomed() { return homed; }
 
 bool isPositioned() { return isStartPosSet && isEndPosSet; }
