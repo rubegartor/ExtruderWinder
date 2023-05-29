@@ -25,8 +25,8 @@ BlockNot readDiameter(80);
 BlockNot extruderResume(1000);
 
 bool homed;
-AlignerStatus alignerActualStatus = alignerNoStatus;
 uint8_t ignoreStallNum;
+AlignerStatus alignerActualStatus = alignerNoStatus;
 
 uint16_t lastTotalRevs = 0;
 
@@ -221,6 +221,10 @@ void aTask(void *pvParameters) {
       if (isHomed() && extruderResume.TRIGGERED) {
         _wifiOutSender();
       }
+
+      if (isHomed() && lcdMenu.menuPosition == pullerSpeedOption) {
+        lcdMenu.checkLCDButtons();
+      }
     }
 
     if (isHomed() && alignerActualStatus == alignerStart && !isPositioned()) {
@@ -240,10 +244,6 @@ void aTask(void *pvParameters) {
       if (spoolTotalRevs != lastTotalRevs) {
         lastTotalRevs = spoolTotalRevs;
         _moveAligner();
-      }
-
-      if (lcdMenu.menuPosition == pullerSpeedOption) {
-        lcdMenu.checkLCDButtons();
       }
 
       if (readDistance.TRIGGERED) {

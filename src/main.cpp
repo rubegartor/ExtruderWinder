@@ -1,6 +1,5 @@
 #include <Aligner/Aligner.h>
 #include <Arduino.h>
-#include <BlockNot.h>
 #include <Commons/Commons.h>
 #include <SPI.h>
 #include <Winder/Winder.h>
