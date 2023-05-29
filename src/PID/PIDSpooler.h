@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <PID_v1.h>
 
 #define MIN_PID_SPOOLER_OUTPUT_LIMIT 0
 #define MAX_PID_SPOOLER_OUTPUT_LIMIT 255

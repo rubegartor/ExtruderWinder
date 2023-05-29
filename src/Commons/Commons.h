@@ -1,6 +1,5 @@
 #pragma once
 
-#include <AiEsp32RotaryEncoder.h>
 #include <Arduino.h>
 #include <Commons/Commons.h>
 #include <LCD/LCDMenu.h>
@@ -11,9 +10,6 @@
 #include <RotaryEncoder/RotaryEncoder.h>
 #include <Tensioner/Tensioner.h>
 #include <WiFi/WifiOut.h>
-
-#include "soc/timer_group_reg.h"
-#include "soc/timer_group_struct.h"
 
 #define R_SENSE 0.11f  // TMC2130
 #define STALLGUARD_SENSITIVITY 5
