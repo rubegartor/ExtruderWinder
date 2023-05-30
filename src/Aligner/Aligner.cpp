@@ -205,7 +205,11 @@ void aTask(void *pvParameters) {
 
     wifiOut.receive();
 
-    if (measuring.mode == measuringAutoMode) {
+    if (isHomed() && readDiameter.TRIGGERED) {
+      measuring.read();
+    }
+
+    if (isHomed() && measuring.mode == measuringAutoMode) {
       pullerSpeed = pidPuller.computeSpeed();
     }
 
