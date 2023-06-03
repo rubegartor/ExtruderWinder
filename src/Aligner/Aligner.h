@@ -6,8 +6,10 @@
 #define ALIGNER_STEP_PIN 4
 #define ALIGNER_CS_PIN 2
 #define ALIGNER_HOME_SENSOR_PIN 39  // NO SE USA (ANTIGUO SENSOR HOME)
-#define ALIGNER_FIRST_MOVE -300
+#define ALIGNER_STARTUP_MOVE -100
 #define ALIGNER_MAX_SPEED 10000
+
+#define ALIGNER_MAX_DISTANCE -5300 // En steps
 
 // Número de lecturas de stallguard a ignorar
 #define STALLGUARD_IGNORE 10

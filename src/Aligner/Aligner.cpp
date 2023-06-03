@@ -25,6 +25,7 @@ BlockNot readDiameter(80);
 BlockNot extruderResume(1000);
 
 bool homed;
+bool onStartupMove;
 uint8_t ignoreStallNum;
 AlignerStatus alignerActualStatus = alignerNoStatus;
 
@@ -75,9 +76,13 @@ int16_t _moveStep() {
     steps = -steps;
   }
 
-  alignerMotor.setAcceleration(20000);
-  alignerMotor.setSpeed(200);
-  alignerMotor.runToNewPosition(alignerMotor.currentPosition() + steps);
+  long toGo = alignerMotor.currentPosition() + steps;
+
+  if (toGo <= 0 && abs(toGo) <= abs(ALIGNER_MAX_DISTANCE)) {
+    alignerMotor.setAcceleration(20000);
+    alignerMotor.setSpeed(200);
+    alignerMotor.runToNewPosition(toGo);
+  }
 
   return alignerMotor.currentPosition();
 }
@@ -131,6 +136,7 @@ void _homeProcess() {
     } else {
       if (_getStallValue() < STALLGUARD_THRESHOLD) {
         homed = true;
+        alignerMotor.setCurrentPosition(0);
       }
     }
   }
@@ -194,11 +200,22 @@ void _positionAligner() {
   }
 }
 
+void _doStartupMove() {
+  if (!onStartupMove) {
+    alignerMotor.setCurrentPosition(0);
+    alignerMotor.setAcceleration(10000);
+    alignerMotor.setSpeed(1500);
+    alignerMotor.runToNewPosition(ALIGNER_STARTUP_MOVE);
+    onStartupMove = true;
+  }
+}
+
 void aTask(void *pvParameters) {
   alignerMotor.setMaxSpeed(ALIGNER_MAX_SPEED);
   alignerMotor.setSpeed(1500);
 
   for (;;) {
+    _doStartupMove();
     _homeProcess();
 
     // ------------------------------------------
