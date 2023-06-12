@@ -5,8 +5,8 @@
 
 TMC2130Stepper driverSpool = TMC2130Stepper(SPOOL_CS_PIN, R_SENSE);
 
-AccelStepper spoolMotor(AccelStepper::DRIVER, SPOOL_STEP_PIN, -1);
-AccelStepper pullerMotor(AccelStepper::DRIVER, PULLER_STEP_PIN, -1);
+AccelStepper spoolMotor(AccelStepper::DRIVER, SPOOL_STEP_PIN, 0);
+AccelStepper pullerMotor(AccelStepper::DRIVER, PULLER_STEP_PIN, 0);
 
 bool alignerTestRun;
 
