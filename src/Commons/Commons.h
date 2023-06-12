@@ -12,7 +12,7 @@
 #include <WiFi/WifiOut.h>
 
 #define R_SENSE 0.11f  // TMC2130
-#define STALLGUARD_SENSITIVITY 5
+#define STALLGUARD_SENSITIVITY 10
 
 #define BUZZER_PIN 12
 

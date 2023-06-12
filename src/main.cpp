@@ -36,10 +36,7 @@ void setup() {
 
   configSpoolDriver();
 
-  pinMode(SPOOL_DIR_PIN, OUTPUT);
   pinMode(SPOOL_STEP_PIN, OUTPUT);
-
-  digitalWrite(SPOOL_DIR_PIN, LOW);
 
   pinMode(ALIGNER_DIR_PIN, OUTPUT);
   pinMode(ALIGNER_STEP_PIN, OUTPUT);

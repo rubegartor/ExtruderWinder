@@ -5,8 +5,10 @@
 
 TMC2130Stepper driverSpool = TMC2130Stepper(SPOOL_CS_PIN, R_SENSE);
 
-AccelStepper spoolMotor(AccelStepper::DRIVER, SPOOL_STEP_PIN, SPOOL_DIR_PIN);
-AccelStepper pullerMotor(AccelStepper::DRIVER, PULLER_STEP_PIN, PULLER_DIR_PIN);
+AccelStepper spoolMotor(AccelStepper::DRIVER, SPOOL_STEP_PIN, -1);
+AccelStepper pullerMotor(AccelStepper::DRIVER, PULLER_STEP_PIN, -1);
+
+bool alignerTestRun;
 
 void configSpoolDriver() {
   driverSpool.begin();              // Initiate pins and registers
@@ -23,7 +25,9 @@ void initWinder() { spoolMotor.setMaxSpeed(SPOOL_MAX_SPEED); }
 void IRAM_ATTR winderLoop() {
   spoolSpeed = pidSpooler.computeSpeed();
 
-  if (isReady()) {
+  if (isReady() || alignerTestRun) {
+    if (alignerTestRun) spoolSpeed = SPOOL_MAX_SPEED / 2;
+
     spoolMotor.setSpeed(spoolSpeed);
     spoolMotor.runSpeed();
 
@@ -59,6 +63,8 @@ void IRAM_ATTR wTask(void* pvParameters) {
     watchDogFeed();
   }
 }
+
+void toggleAlignerTestRun() { alignerTestRun = !alignerTestRun; }
 
 float getExtrudedLength() {
   float circ = PI * ((float)PULLER_DIAM / 1000.0f);

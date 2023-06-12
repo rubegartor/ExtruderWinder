@@ -19,7 +19,7 @@ AccelStepper alignerMotor(AccelStepper::DRIVER, ALIGNER_STEP_PIN,
                           ALIGNER_DIR_PIN);
 
 BlockNot homeTimer(5);
-BlockNot readDistance(200);
+BlockNot readDistance(150);
 BlockNot updateSummary(500);
 BlockNot readDiameter(80);
 BlockNot extruderResume(1000);
@@ -58,6 +58,8 @@ void startAlignerPosition() {
   startPosMessageShowed = false;
   spoolEndPos = 0;
   alignerActualStatus = alignerStart;
+
+  toggleAlignerTestRun();
 }
 
 void resetHome() {
@@ -154,6 +156,10 @@ void _LCDActions() {
   if (rotaryEncoder.clicked()) {
     lcdMenu.onREncoderClick(rotaryEncoder);
   }
+
+  if (lcdMenu.menuPosition == pullerSpeedOption) {
+    lcdMenu.checkLCDButtons();
+  }
 }
 
 void _wifiOutSender() {
@@ -166,6 +172,8 @@ void _wifiOutSender() {
   }
 }
 
+// TODO: Rotar el spooler mientras se selecciona el inicio y fin del
+// posicionador
 void _positionAligner() {
   if (!isStartPosSet) {
     if (rotaryEncoder.changed()) {
@@ -188,6 +196,8 @@ void _positionAligner() {
 
     if (rotaryEncoder.clicked()) {
       isEndPosSet = true;
+      toggleAlignerTestRun();
+      resetSpoolerRevs();
       spoolEndPos = alignerMotor.currentPosition();
 
       alignerMotor.setSpeed(1000);
@@ -241,10 +251,6 @@ void aTask(void *pvParameters) {
 
       if (isHomed() && extruderResume.TRIGGERED) {
         _wifiOutSender();
-      }
-
-      if (isHomed() && lcdMenu.menuPosition == pullerSpeedOption) {
-        lcdMenu.checkLCDButtons();
       }
     }
 
