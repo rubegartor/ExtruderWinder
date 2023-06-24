@@ -12,5 +12,7 @@ class Tensioner {
 
   void init();
 
+  void restart();
+
   uint16_t IRAM_ATTR getDistance();
 };

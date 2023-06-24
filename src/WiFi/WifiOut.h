@@ -1,17 +1,28 @@
 #pragma once
 
 #include <Arduino.h>
+#include <ESPAsyncWebServer.h>
+#include <WiFi.h>
+#include "AsyncTCP.h"
+
+#define WIFI_HOSTNAME "filamentExtruder"
+
+#define MAX_RETRIES 10
 
 class WifiOut {
  private:
-  bool connected;
+  uint8_t retries;
 
-  void processWifiMessages(String header, String data);
+  void startServer();
 
  public:
+  bool connected;
+
   String ipAddr;
 
-  bool isConnected();
-  void put(String header, String info, String data = "");
-  void receive();
+  void connect();
+
+  void handleEvents();
+
+  void putEvent(const char* eventName, String eventData);
 };

@@ -8,16 +8,18 @@
 #include <PID/PIDSpooler.h>
 #include <Preferences.h>
 #include <RotaryEncoder/RotaryEncoder.h>
+#include <Task/Task.h>
+#include <Steppers/Aligner/Aligner.h>
+#include <Steppers/Puller/Puller.h>
+#include <Steppers/Spooler/Spooler.h>
 #include <Tensioner/Tensioner.h>
 #include <WiFi/WifiOut.h>
 
-#define R_SENSE 0.11f  // TMC2130
 #define STALLGUARD_SENSITIVITY 10
 
 #define BUZZER_PIN 12
 
 #define STEPPER_DEF_STEPS 200
-#define DEFAULT_PULLER_SPEED 1500
 #define NAMESPACE "extruder"
 
 #define FILAMENT_DIAMETER_MODE_PREF "filaDiam"
@@ -28,10 +30,14 @@
 
 const float spoolMotorRatio = 5.16;
 const uint16_t stepsPerCm = 525;
-const uint16_t oneRevSpool = (STEPPER_DEF_STEPS * 4) * spoolMotorRatio;
-const uint16_t oneRevPuller = STEPPER_DEF_STEPS * 16;
+const uint16_t oneRevSpool = (STEPPER_DEF_STEPS * 4) * spoolMotorRatio; //TODO: Mover al archivo de cabecera correspondiente
+const uint16_t oneRevPuller = STEPPER_DEF_STEPS * 16; //TODO: Mover al archivo de cabecera correspondiente
 
 extern Preferences pref;
+extern Task task;
+extern Aligner aligner;
+extern Spooler spooler;
+extern Puller puller;
 extern WifiOut wifiOut;
 extern PIDPuller pidPuller;
 extern PIDSpooler pidSpooler;
@@ -50,10 +56,6 @@ struct Polymer {
                          // para calcularlo)
 };
 
-extern uint16_t spoolTotalRevs;
-extern uint16_t pullerTotalRevs;
-extern uint16_t spoolSpeed;
-extern uint16_t pullerSpeed;
 extern float filamentDiameter;
 extern ulong millisOffset;
 extern Polymer polymers[POLYMER_NUMBER];
@@ -72,4 +74,6 @@ void doAlarm();
 
 float ruleOfThree(float A, float B, float X);
 
-void IRAM_ATTR watchDogFeed();
+float getExtrudedLength();
+
+float getExtrudedWeight();

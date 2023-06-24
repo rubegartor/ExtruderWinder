@@ -1,59 +1,85 @@
 #include <Commons/Commons.h>
+#include <FS.h>
+#include <WiFi.h>
+#include <WiFi/WifiCredentials.h>
 #include <WiFi/WifiOut.h>
+#include <WiFiMulti.h>
 
-/**
- * - Para enviar datos al ESP-01S se usa el puerto TX2
- * - Para recibit datos del ESP-01S se usa el puerto RX
- */
+#include "SPIFFS.h"
 
-bool WifiOut::isConnected() { return this->connected; }
+WiFiMulti wifiMulti;
+AsyncWebServer server(80);
+AsyncEventSource events("/events");
 
-void WifiOut::put(String header, String info, String data) {
-  if (Serial2.availableForWrite()) {
-    Serial2.println(header + "," + info + "," + data);
+void WifiOut::connect() {
+  IPAddress ip(10, 2, 0, 188);
+  IPAddress gateway(10, 2, 0, 254);
+  IPAddress subnet(255, 255, 255, 0);
+  WiFi.config(ip, gateway, subnet);
+  WiFi.setAutoReconnect(true);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.setHostname(WIFI_HOSTNAME);
+
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods",
+                                       "GET, POST, PUT");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers",
+                                       "Content-Type");
+
+  for (uint8_t i = 0; i < MAX_NETWORKS; i++) {
+    wifiMulti.addAP(networks[i][0], networks[i][1]);
+  }
+
+  while (wifiMulti.run() != WL_CONNECTED && this->retries <= MAX_RETRIES) {
+    this->retries += 1;
+    delay(1000);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) this->connected = true;
+
+  if (this->connected) {
+    this->ipAddr = WiFi.localIP().toString();
+    Serial.println("IP address: " + this->ipAddr);
+
+    this->startServer();
   }
 }
 
-void WifiOut::processWifiMessages(String header, String data) {
-  if (header == "IPAddress") {
-    this->ipAddr = data;
-    this->connected = true;
+void WifiOut::startServer() {
+  if (!SPIFFS.begin()) {
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
   }
 
-  if (header == "requestMeasuring") {
-    this->put("Extruder", "Measuring",
-              (String)measuring.minRead + "," + (String)measuring.maxRead);
-  }
+  server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    request->send(SPIFFS, "/script.js", "text/javascript");
+  });
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
+    request->send(SPIFFS, "/index.html", String(), false);
+  });
+
+  events.onConnect([](AsyncEventSourceClient* client) {
+    client->send("", NULL, millis(), 100);
+  });
+
+  server.addHandler(&events);
+  server.begin();
 }
 
-int _splitString(String str, char delim, String outArr[], int maxCount) {
-  int count = 0;
-  int pos = 0;
-  int lastPos = 0;
+void WifiOut::putEvent(const char* eventName, String eventData) {
+  if (!this->connected) return;
 
-  while (pos != -1 && count < maxCount) {
-    pos = str.indexOf(delim, lastPos);
-    if (pos == -1) {
-      outArr[count++] = str.substring(lastPos);
-    } else {
-      outArr[count++] = str.substring(lastPos, pos);
-      lastPos = pos + 1;
-    }
-  }
-
-  return count;
+  events.send(eventData.c_str(), eventName, millis());
 }
 
-void WifiOut::receive() {
-  if (Serial.available() > 0) {
-    String read = Serial.readStringUntil('\n');
-    read.trim();
+void WifiOut::handleEvents() {
+  if (!this->connected) return;
 
-    if (read.length() > 0) {
-      String arr[3];
-      _splitString(read, ',', arr, 3);
-
-      if (arr[0] == "WiFi") this->processWifiMessages(arr[1], arr[2]);
-    }
-  }
+  events.send("ping", NULL, millis());
+  events.send(String(getExtrudedLength()).c_str(), "extrudedLength", millis());
+  events.send(String(getExtrudedWeight()).c_str(), "extrudedWeight", millis());
+  events.send(String(puller.speed).c_str(), "pullerSpeed", millis());
+  events.send(String(millis() - millisOffset).c_str(), "time", millis());
 }

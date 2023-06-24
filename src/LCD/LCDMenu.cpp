@@ -1,9 +1,10 @@
-#include <Aligner/Aligner.h>
 #include <Commons/Commons.h>
 #include <LCD/LCDMenu.h>
 #include <LiquidCrystal_I2C.h>
 #include <RotaryEncoder/RotaryEncoder.h>
-#include <Winder/Winder.h>
+#include <Steppers/Aligner/Aligner.h>
+#include <Steppers/Puller/Puller.h>
+#include <Steppers/Spooler/Spooler.h>
 #include <math.h>
 
 LiquidCrystal_I2C lcd(LCD_ADRRESS, LCD_BUFFER, MENU_MAX_OPTIONS_SHOWED);
@@ -71,7 +72,7 @@ void LCDMenu::initSummary(bool clear) {
   // ------------------------------------------------------------------
 
   char pullerSpeedBuffer[LCD_BUFFER];
-  sprintf(pullerSpeedBuffer, "%-5d", pullerSpeed);
+  sprintf(pullerSpeedBuffer, "%-5d", puller.speed);
 
   lcd.setCursor(0, 0);
   lcd.print("S");
@@ -139,10 +140,10 @@ void LCDMenu::initMenu(MenuOption option, bool clear) {
     lcd.setCursor(1, j - menuOverflow);
     lcd.print(strOpt);
 
-    if (strOpt.startsWith("Posicionar") && isPositioned()) {
+    if (strOpt.startsWith("Posicionar") && aligner.isPositioned()) {
       lcd.write(byte(1));
       lcd.print("]     ");
-    } else if (strOpt.startsWith("Posicionar") && !isPositioned()) {
+    } else if (strOpt.startsWith("Posicionar") && !aligner.isPositioned()) {
       lcd.write(byte(5));
       lcd.print("]     ");
     }
@@ -203,7 +204,7 @@ void LCDMenu::pullerSpeedSubMenu() {
   }
 
   char pullerSpeedBuffer[LCD_BUFFER];
-  sprintf(pullerSpeedBuffer, "Velocidad: %-5d", pullerSpeed);
+  sprintf(pullerSpeedBuffer, "Velocidad: %-5d", puller.speed);
 
   lcd.setCursor(2, 0);
   lcd.print(pullerSpeedBuffer);
@@ -292,11 +293,10 @@ void LCDMenu::infoSubMenu() {
   lcd.clear();
 
   lcd.setCursor(0, 0);
-  if (wifiOut.isConnected()) {
-    lcd.print("IP: " + wifiOut.ipAddr);
-  } else {
-    lcd.print("IP: Sin conexion");
-  }
+  lcd.print("IP: " + (String)(wifiOut.connected ? wifiOut.ipAddr : "Sin conexion"));
+
+  lcd.setCursor(0, 1);
+  lcd.print("AVG: " + (String)measuring.average() + " mm");
 }
 
 bool LCDMenu::inConfigSubMenuOptions() {
@@ -392,7 +392,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
   }
 
   if (this->inSubMenu) {
-    uint16_t actualPullerSpeed = pullerSpeed;
+    uint16_t actualPullerSpeed = puller.speed;
 
     switch (this->menuPosition) {
       case pullerSpeedOption:
@@ -401,20 +401,20 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
         if (rEncoder.direction == increased) {
           if (actualPullerSpeed + speeds[this->speedOption] >
               PULLER_MAX_SPEED) {
-            pullerSpeed = PULLER_MAX_SPEED;
+            puller.speed = PULLER_MAX_SPEED;
           } else {
-            pullerSpeed = actualPullerSpeed + speeds[this->speedOption];
+            puller.speed = actualPullerSpeed + speeds[this->speedOption];
           }
         } else {
           if (actualPullerSpeed - speeds[this->speedOption] < 0) {
-            pullerSpeed = 0;
+            puller.speed = 0;
           } else {
-            pullerSpeed = actualPullerSpeed - speeds[this->speedOption];
+            puller.speed = actualPullerSpeed - speeds[this->speedOption];
           }
         }
 
         char pullerSpeedBuffer[LCD_BUFFER];
-        sprintf(pullerSpeedBuffer, "Velocidad: %-5d", pullerSpeed);
+        sprintf(pullerSpeedBuffer, "Velocidad: %-5d", puller.speed);
 
         lcd.setCursor(2, 0);
         lcd.print(pullerSpeedBuffer);
@@ -591,9 +591,9 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
 
   if (this->inSubMenu && this->menuPosition == resetCountersOption) {
     if (this->continueMenu) {
-      pullerTotalRevs = 0;
+      puller.totalRevs = 0;
+      spooler.totalRevs = 0;
       millisOffset = millis();
-      resetSpoolerRevs();
       measuring.reset();
       this->initSummary(true);
     } else {
@@ -608,8 +608,8 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
 
   if (this->inSubMenu && this->menuPosition == homeAlignerOption) {
     if (this->continueMenu) {
-      resetHome();
-      startAlignerPosition();
+      aligner.resetHome();
+      aligner.startAlignerPosition();
     } else {
       this->initMenu((MenuOption)this->menuPosition, true);
     }
@@ -638,11 +638,11 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
         this->initSummary(true);
         break;
       case homeAlignerOption:
-        if (isPositioned()) {
+        if (aligner.isPositioned()) {
           this->inSubMenu = true;
           this->confirmationMenu("Posicionar de nuevo?");
         } else {
-          startAlignerPosition();
+          aligner.startAlignerPosition();
         }
         break;
       case pullerSpeedOption:

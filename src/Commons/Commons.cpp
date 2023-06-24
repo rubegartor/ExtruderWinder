@@ -1,19 +1,10 @@
-#include <AiEsp32RotaryEncoder.h>
-#include <Aligner/Aligner.h>
-#include <Arduino.h>
 #include <Commons/Commons.h>
-#include <LCD/LCDMenu.h>
-#include <Measuring/Measuring.h>
-#include <PID/PIDPuller.h>
-#include <PID/PIDSpooler.h>
-#include <Preferences.h>
-#include <RotaryEncoder/RotaryEncoder.h>
-#include <Tensioner/Tensioner.h>
-
-#include "soc/timer_group_reg.h"
-#include "soc/timer_group_struct.h"
 
 Preferences pref;
+Task task;
+Aligner aligner;
+Spooler spooler;
+Puller puller;
 WifiOut wifiOut;
 PIDPuller pidPuller;
 PIDSpooler pidSpooler;
@@ -31,10 +22,6 @@ Polymer PETG;
 Polymer PCABS;
 Polymer OTHER;
 
-uint16_t spoolTotalRevs;
-uint16_t pullerTotalRevs;
-uint16_t spoolSpeed = 0;
-uint16_t pullerSpeed = DEFAULT_PULLER_SPEED;
 float filamentDiameter = DEFAULT_FILAMENT_DIAMETER;
 ulong millisOffset = 0;
 Polymer polymers[POLYMER_NUMBER];
@@ -103,7 +90,7 @@ void commonsInit() {
   pidPuller.updateSetPoint(filamentDiameter);
 }
 
-bool isReady() { return isHomed() && isPositioned(); }
+bool isReady() { return aligner.isHomed() && aligner.isPositioned(); }
 
 String getTime(unsigned long millis) {
   ulong seconds = (millis / 1000) % 60;
@@ -116,7 +103,7 @@ String getTime(unsigned long millis) {
 }
 
 void doBeep() {
-  if (pidPuller.inAutoStop()) return;
+  if (measuring.autoStopStatus == autoStopTriggered) return;
 
   digitalWrite(BUZZER_PIN, HIGH);
   delay(5);
@@ -138,8 +125,20 @@ float ruleOfThree(float A, float B, float C) {
   return (B * C) / A;
 }
 
-void IRAM_ATTR watchDogFeed() {
-  TIMERG0.wdt_wprotect = TIMG_WDT_WKEY_VALUE;
-  TIMERG0.wdt_feed = 1;
-  TIMERG0.wdt_wprotect = 0;
+// --------------------------
+
+float getExtrudedLength() {
+  float circ = PI * ((float)PULLER_DIAM / 1000.0f);
+  float value = circ * (float)puller.totalRevs;
+
+  return circ * (float)puller.totalRevs;
+}
+
+float getExtrudedWeight() {
+  Polymer actualPolymer =
+      stringToPolymer(pref.getString(SELECTED_POLYMER_PREF, polymers[0].name));
+
+  return getExtrudedLength() * ruleOfThree(DEFAULT_FILAMENT_DIAMETER,
+                                           actualPolymer.weight,
+                                           filamentDiameter);
 }

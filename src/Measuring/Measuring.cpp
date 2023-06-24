@@ -7,22 +7,36 @@ void Measuring::init() {
       (MeasuringMode)pref.getUInt(MEASURING_MODE_PREF, measuringManualMode);
 }
 
-float Measuring::read() {
-  if (Serial2.available() > 0) {
-    String read = Serial2.readStringUntil('\n');
+bool Measuring::isValidMeasurement(String measurement) {
+  return measurement.indexOf('.') > 0 && measurement.length() == 4;
+}
 
-    this->lastRead = atof(read.c_str());
-    this->readValueNum++;
-    this->readValueSum += this->lastRead;
+float Measuring::read() {
+  String read;
+
+  if (Serial2.available() > 0) {
+    read = Serial2.readStringUntil('\n');
+    read.trim();
+
+    if (this->isValidMeasurement(read)) {
+      this->lastRead = atof(read.c_str());
+      this->readValueNum++;
+      this->readValueSum += this->lastRead;
+
+      if (millis() - this->lastSendOutMillis > 100) {
+        wifiOut.putEvent("lastRead", (String)this->lastRead);
+        this->lastSendOutMillis = millis();
+      }
+    }
   }
 
   if (this->lastRead < this->minRead) {
     this->minRead = this->lastRead;
+    wifiOut.putEvent("minRead", (String)this->minRead);
   } else if (this->lastRead > this->maxRead) {
     this->maxRead = this->lastRead;
+    wifiOut.putEvent("maxRead", (String)this->maxRead);
   }
-
-  wifiOut.put("Extruder", "DiameterReading", (String)this->lastRead);
 
   if (this->mode == measuringAutoMode) {
     float autoStopThr =
@@ -30,8 +44,12 @@ float Measuring::read() {
 
     double gap = abs(pidPuller.getSetPoint() - this->lastRead);
 
-    if (this->autoStopEnabled && gap > autoStopThr) {
-      pidPuller.emergencyStop();
+    if (this->autoStopStatus == autoStopEnabled && gap > autoStopThr) {
+      this->autoStopStatus = autoStopTriggered;
+
+      Serial.println("Autostop triggered");
+      Serial.println("String: " + read);
+      Serial.println("Conversion: " + (String)this->lastRead);
     }
   }
 
@@ -50,7 +68,9 @@ void Measuring::reset() {
   double gap =
       abs(pidPuller.getSetPoint() - this->lastRead) - pidPuller.getSetPoint();
 
-  this->autoStopEnabled = abs(gap) > AUTOSTOP_ENABLE_THRESHOLD;
+  if (abs(gap) > AUTOSTOP_ENABLE_THRESHOLD) {
+    this->autoStopStatus = autoStopEnabled;
+  }
 
   this->minRead = this->lastRead;
   this->maxRead = this->lastRead;
@@ -58,7 +78,8 @@ void Measuring::reset() {
   this->readValueNum = 0;
   this->readValueSum = 0;
 
-  wifiOut.put("Extruder", "Reset");
+  wifiOut.putEvent("minRead", (String)this->minRead);
+  wifiOut.putEvent("maxRead", (String)this->minRead);
 }
 
 String Measuring::measuringModeString() {

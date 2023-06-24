@@ -14,7 +14,6 @@
 
 class PIDPuller {
  private:
-  bool activated;
   double setPoint, input, output;
   double aggKp = 5, aggKi = 25, aggKd = 0.05;
   double Kp = 2, Ki = 12.5, Kd = 1;
@@ -27,10 +26,6 @@ class PIDPuller {
   uint16_t maxOutput;
 
   void init();
-
-  bool inAutoStop();
-
-  void emergencyStop();
 
   double getSetPoint();
 

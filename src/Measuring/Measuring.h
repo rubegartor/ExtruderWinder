@@ -11,12 +11,17 @@
 
 enum MeasuringMode { measuringAutoMode, measuringManualMode };
 
+enum AutoStopStatus { autoStopEnabled, autoStopDisabled, autoStopTriggered };
+
 class Measuring {
  private:
-  bool autoStopEnabled = false;
+  long lastSendOutMillis;
+
+  bool isValidMeasurement(String measurement);
 
  public:
   MeasuringMode mode = measuringManualMode;
+  AutoStopStatus autoStopStatus = autoStopDisabled;
   float readValueSum = 0.00f;
   uint32_t readValueNum = 0;
   float lastRead = 0.00f;
