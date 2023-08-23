@@ -6,7 +6,7 @@ PID spoolerPID(0, 0, 0, 0, 0, 0, DIRECT);
 
 void PIDSpooler::init() {
   PID pid(&this->input, &this->output, &this->setPoint, this->Kp, this->Ki,
-               this->Kd, DIRECT);
+          this->Kd, DIRECT);
 
   spoolerPID = pid;
 
@@ -20,15 +20,15 @@ void PIDSpooler::init() {
 uint16_t PIDSpooler::computeSpeed() {
   this->input = tensioner.lastRead;
 
-  this->doCompute(this->input);
+  this->doCompute();
 
   return this->lastComputed;
 }
 
-void PIDSpooler::doCompute(float input) {
+void PIDSpooler::doCompute() {
   spoolerPID.Compute();
 
   this->lastComputed =
-      map(this->output, MIN_PID_SPOOLER_OUTPUT_LIMIT, MAX_PID_SPOOLER_OUTPUT_LIMIT,
-          this->maxOutput, this->minOutput);
+      map(this->output, MIN_PID_SPOOLER_OUTPUT_LIMIT,
+          MAX_PID_SPOOLER_OUTPUT_LIMIT, this->maxOutput, this->minOutput);
 }

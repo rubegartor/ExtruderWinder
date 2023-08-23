@@ -1,10 +1,10 @@
 #include <Arduino.h>
 #include <BlockNot.h>
 #include <Commons/Commons.h>
-#include <LCD/LCDMenu.h>
 #include <Steppers/Aligner/Aligner.h>
 
-TMC2130Stepper driverAligner = TMC2130Stepper(ALIGNER_CS_PIN, 0.11f);
+TMC2130Stepper driverAligner =
+    TMC2130Stepper(ALIGNER_CS_PIN, 0.11f, SPI_MOSI, SPI_MISO, SPI_SCK);
 
 AccelStepper alignerMotor(AccelStepper::DRIVER, ALIGNER_STEP_PIN,
                           ALIGNER_DIR_PIN);
@@ -17,12 +17,12 @@ MotorDirEnum motorDir = forward;
 using namespace TMC2130_n;
 
 void Aligner::configDriver() {
-  driverAligner.begin();             // Initiate pins and registers
-  driverAligner.toff(4);             // off time
-  driverAligner.blank_time(24);      // blank time
-  driverAligner.rms_current(400);    // 400mAh RMS
-  driverAligner.microsteps(2);       // 2 microsteps
-  driverAligner.TCOOLTHRS(0xFFFFF);  // 20bit max
+  driverAligner.begin();                         // Initiate pins and registers
+  driverAligner.toff(4);                         // off time
+  driverAligner.blank_time(5);                   // blank time
+  driverAligner.rms_current(400);                // 400mAh RMS
+  driverAligner.microsteps(ALIGNER_MICROSTEPS);  // 2 microsteps
+  driverAligner.TCOOLTHRS(0xFFFFF);              // 20bit max
   driverAligner.THIGH(0);
   driverAligner.semin(5);
   driverAligner.semax(2);
@@ -32,9 +32,12 @@ void Aligner::configDriver() {
 
 void Aligner::init() {
   pinMode(ALIGNER_DIR_PIN, OUTPUT);
+
+  this->configDriver();
+
   pinMode(ALIGNER_STEP_PIN, OUTPUT);
 
-  digitalWrite(ALIGNER_DIR_PIN, LOW);
+  alignerMotor.setPinsInverted(true, false, false);
 
   alignerMotor.setMaxSpeed(ALIGNER_MAX_SPEED);
 }
@@ -46,13 +49,19 @@ void Aligner::startAlignerPosition() {
   this->endPos = 0;
   this->alignerActualStatus = alignerStart;
 
-  lcdMenu.println(" Elige el inicio de", 1, true);
-  lcdMenu.println("     la bobina", 2);
+  task.printStartPos = true;
 }
 
 void Aligner::resetHome() {
+  alignerMotor.setPinsInverted(false, false, false);
   this->homed = false;
   this->ignoreStallNum = 0;
+  this->invertedPins = true;
+}
+
+void Aligner::moveTo(long pos) {
+  alignerMotor.moveTo(alignerMotor.currentPosition() + pos);
+  alignerMotor.setSpeed(1250);
 }
 
 bool Aligner::isInPosition() {
@@ -83,23 +92,23 @@ void Aligner::run() {
           alignerMotor.moveTo(ALIGNER_START_POSITION);
           alignerMotor.setSpeed(1500);
 
-          lcdMenu.initSummary(true);
+          task.initSummary = true;
         }
 
         if (!this->isStartPosSet) {
           this->isStartPosSet = true;
           this->preStartPos = alignerMotor.currentPosition();
+          this->startPos = ALIGNER_START_POSITION;
           alignerMotor.setCurrentPosition(ALIGNER_START_POSITION);
 
-          lcdMenu.println(" Elige el final de", 1, true);
-          lcdMenu.println("     la bobina", 2);
+          task.printEndPos = true;
         }
       }
     }
   }
 
   if (isReady()) {
-    if (spooler.totalRevs != this->lastTotalRevs) {
+    if (spooler.totalRevs > this->lastTotalRevs) {
       this->lastTotalRevs = spooler.totalRevs;
       alignerMotor.moveTo(this->calculateStepsForNextAlignerMove(autoAligner));
       alignerMotor.setSpeed(1250);
@@ -117,30 +126,30 @@ void Aligner::run() {
  * Método que mueve el alineador automaticamente cuando se completa una
  * revolucion del winder, corrige automaticamente la dirección
  */
-int16_t Aligner::calculateStepsForNextAlignerMove(AlignerMoveType type) {
-  int16_t stepsToGo = (stepsPerCm * (filamentDiameter / 10));
+long Aligner::calculateStepsForNextAlignerMove(AlignerMoveType type) {
+  long stepsToGo = (STEPS_PER_CM * (filamentDiameter / 10));
 
   if (type == manualAligner) {
-    if (rotaryEncoder.direction == increased) stepsToGo = -stepsToGo;
+    if (rotaryEncoder.direction == decreased) stepsToGo = -stepsToGo;
 
     stepsToGo = alignerMotor.currentPosition() + stepsToGo;
 
-    if (stepsToGo <= ALIGNER_START_POSITION &&
+    if (stepsToGo >= ALIGNER_START_POSITION &&
         abs(stepsToGo + this->preStartPos) <= abs(ALIGNER_MAX_DISTANCE)) {
       return stepsToGo;
     }
 
     return alignerMotor.currentPosition();
   } else {
-    if (alignerMotor.currentPosition() <= this->endPos) {
+    if (alignerMotor.currentPosition() >= this->endPos) {
       motorDir = backward;
     }
 
-    if (alignerMotor.currentPosition() >= ALIGNER_START_POSITION) {
+    if (alignerMotor.currentPosition() <= ALIGNER_START_POSITION) {
       motorDir = forward;
     }
 
-    if (motorDir == forward) {
+    if (motorDir == backward) {
       stepsToGo = -(stepsToGo);
     }
 
@@ -156,6 +165,8 @@ uint16_t Aligner::getStallValue() {
 }
 
 void Aligner::homeProcess() {
+  alignerMotor.setPinsInverted(this->invertedPins, false, false);
+
   if (homeTimer.TRIGGERED && !this->homed) {
     alignerMotor.setSpeed(1500);
 
@@ -165,6 +176,7 @@ void Aligner::homeProcess() {
       if (this->getStallValue() < STALLGUARD_THRESHOLD) {
         this->homed = true;
         alignerMotor.setCurrentPosition(ALIGNER_START_POSITION);
+        alignerMotor.setPinsInverted(true, false, false);
       }
     }
   }
@@ -173,3 +185,27 @@ void Aligner::homeProcess() {
 bool Aligner::isHomed() { return this->homed; }
 
 bool Aligner::isPositioned() { return isStartPosSet && isEndPosSet; }
+
+bool Aligner::isOverTempWarn() {
+  DRV_STATUS_t drv_status{0};
+  drv_status.sr = driverAligner.DRV_STATUS();
+
+  return drv_status.otpw;
+}
+
+bool Aligner::isOverTemp() {
+  DRV_STATUS_t drv_status{0};
+  drv_status.sr = driverAligner.DRV_STATUS();
+
+  return drv_status.ot;
+}
+
+bool Aligner::isEnabled(bool restartIfDisabled) {
+  bool enabled = driverAligner.isEnabled();
+
+  if (restartIfDisabled && !enabled) this->configDriver();
+
+  return enabled;
+}
+
+bool Aligner::isUnderVoltage() { return driverAligner.uv_cp(); }

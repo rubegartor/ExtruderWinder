@@ -5,7 +5,7 @@
 #define MIN_PID_SPOOLER_OUTPUT_LIMIT 0
 #define MAX_PID_SPOOLER_OUTPUT_LIMIT 255
 
-#define SETPOINT_PID_SPOOLER 125
+#define SETPOINT_PID_SPOOLER 100
 
 class PIDSpooler {
  private:
@@ -15,7 +15,7 @@ class PIDSpooler {
   double Kd = 0.03;
   double setPoint, input, output;
 
-  void doCompute(float input);
+  void doCompute();
 
  public:
   uint16_t minOutput;

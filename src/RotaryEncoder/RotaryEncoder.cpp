@@ -27,7 +27,7 @@ void REncoder::init() {
 }
 
 bool REncoder::clicked() {
-  bool isClicked = PhysREncoder.isEncoderButtonClicked();
+  bool isClicked = PhysREncoder.isEncoderButtonClicked(250);
 
   if (isClicked) doBeep();
 

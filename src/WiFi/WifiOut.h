@@ -7,7 +7,7 @@
 
 #define WIFI_HOSTNAME "filamentExtruder"
 
-#define MAX_RETRIES 10
+#define WIFI_MAX_RETRIES 10
 
 class WifiOut {
  private:

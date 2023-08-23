@@ -1,17 +1,17 @@
 #include <Commons/Commons.h>
 
 Preferences pref;
-Task task;
 Aligner aligner;
 Spooler spooler;
 Puller puller;
 WifiOut wifiOut;
+Measuring measuring;
+LCDMenu lcdMenu;
+REncoder rotaryEncoder;
 PIDPuller pidPuller;
 PIDSpooler pidSpooler;
-LCDMenu lcdMenu;
+Task task;
 Tensioner tensioner;
-REncoder rotaryEncoder;
-Measuring measuring;
 
 Polymer ABS;
 Polymer PLA;
@@ -22,9 +22,13 @@ Polymer PETG;
 Polymer PCABS;
 Polymer OTHER;
 
+bool disableSound = false;
 float filamentDiameter = DEFAULT_FILAMENT_DIAMETER;
 ulong millisOffset = 0;
 Polymer polymers[POLYMER_NUMBER];
+
+long alignerDriverErrorCount = 0;
+long spoolDriverErrorCount = 0;
 
 Polymer stringToPolymer(String polymerName) {
   if (polymerName == "PLA") return polymers[0];
@@ -42,52 +46,47 @@ Polymer stringToPolymer(String polymerName) {
 void initPolymers() {
   PLA.name = "PLA";
   PLA.weight = 2.98f;
-  PLA.diameterOffset = 0.00f;
   polymers[0] = PLA;
 
   ABS.name = "ABS";
   ABS.weight = 2.45f;
-  ABS.diameterOffset = 0.00f;
   polymers[1] = ABS;
 
   TPU80.name = "TPU-80";
   TPU80.weight = 3.26f;
-  TPU80.diameterOffset = 0.17f;
   polymers[2] = TPU80;
 
   TPU85.name = "TPU-85";
   TPU85.weight = 3.26f;
-  TPU85.diameterOffset = 0.13f;
   polymers[3] = TPU85;
 
   TPU90.name = "TPU-90";
   TPU90.weight = 3.52f;
-  TPU90.diameterOffset = 0.08f;
   polymers[4] = TPU90;
 
   PETG.name = "PETG";
   PETG.weight = 3.05f;
-  PETG.diameterOffset = 0.00f;
   polymers[5] = PETG;
 
   PCABS.name = "PC/ABS";
   PCABS.weight = 2.60f;
-  PCABS.diameterOffset = 0.00f;
   polymers[6] = PCABS;
 
   OTHER.name = "Otro";
   OTHER.weight = 0.00f;
-  OTHER.diameterOffset = 0.00f;
   polymers[7] = OTHER;
 }
 
 void commonsInit() {
+  pinMode(BUZZER_PIN, OUTPUT);
+
+  pinMode(DEFAULT_SPI_DIR_PIN, OUTPUT);
+  digitalWrite(DEFAULT_SPI_DIR_PIN, LOW);
+
   initPolymers();
 
   filamentDiameter =
       pref.getFloat(FILAMENT_DIAMETER_MODE_PREF, DEFAULT_FILAMENT_DIAMETER);
-
-  pidPuller.updateSetPoint(filamentDiameter);
 }
 
 bool isReady() { return aligner.isHomed() && aligner.isPositioned(); }
@@ -125,8 +124,6 @@ float ruleOfThree(float A, float B, float C) {
   return (B * C) / A;
 }
 
-// --------------------------
-
 float getExtrudedLength() {
   float circ = PI * ((float)PULLER_DIAM / 1000.0f);
   float value = circ * (float)puller.totalRevs;
@@ -135,8 +132,7 @@ float getExtrudedLength() {
 }
 
 float getExtrudedWeight() {
-  Polymer actualPolymer =
-      stringToPolymer(pref.getString(SELECTED_POLYMER_PREF, polymers[0].name));
+  Polymer actualPolymer = stringToPolymer(polymers[0].name);
 
   return getExtrudedLength() * ruleOfThree(DEFAULT_FILAMENT_DIAMETER,
                                            actualPolymer.weight,

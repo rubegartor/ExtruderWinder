@@ -23,10 +23,7 @@ void PIDPuller::init() {
 double PIDPuller::getSetPoint() { return this->setPoint; }
 
 void PIDPuller::updateSetPoint(float setPoint) {
-  Polymer actualPolymer =
-      stringToPolymer(pref.getString(SELECTED_POLYMER_PREF, polymers[0].name));
-
-  this->setPoint = setPoint - actualPolymer.diameterOffset;
+  this->setPoint = setPoint;
 
   wifiOut.putEvent("setPoint", (String)this->setPoint);
 }
@@ -52,12 +49,12 @@ uint16_t PIDPuller::computeSpeed() {
     pullerPID.SetTunings(this->Kp, this->Ki, this->Kd);
   }
 
-  this->doCompute(this->input);
+  this->doCompute();
 
   return this->lastComputed;
 }
 
-void PIDPuller::doCompute(float input) {
+void PIDPuller::doCompute() {
   pullerPID.Compute();
 
   this->lastComputed =

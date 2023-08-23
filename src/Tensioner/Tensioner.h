@@ -2,17 +2,26 @@
 
 #include <Arduino.h>
 
-#define GPIO1_INTERRUPT_PIN 39
-#define SHUTDOWN_PIN 14
+#define TENSIONER_TRIGGER_PIN 40
+#define TENSIONER_ECHO_PIN 41
 
+#define TENSIONER_SOUND_SPEED .0343f
+#define TENSIONER_MAX_DISTANCE 250
+#define TENSIONER_PERTCENT_DIFF 35
 
 class Tensioner {
+ private:
+  long firstRead;
+  long secondRead;
+
+  long getDistance();
+
+  long calcDiffPercent(long valorAnterior, long valorNuevo);
+
  public:
-  uint16_t lastRead;
+  long lastRead;
 
   void init();
 
-  void restart();
-
-  uint16_t IRAM_ATTR getDistance();
+  void run();
 };

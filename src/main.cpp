@@ -3,43 +3,41 @@
 #include <SPI.h>
 
 void setup() {
-  Serial.begin(115200);  // Solo para debug
-  Serial2.begin(115200);
-  while (!Serial2)
-    ;
-
-  Serial.println(F("Starting Serial2..."));
-
-  pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, LOW);
-
-  SPI.begin();
-
-  pinMode(MISO, INPUT_PULLUP);
-
-  aligner.configDriver();
-
-  spooler.configDriver();
-
-  pref.begin(NAMESPACE, false);
-
-  commonsInit();
-
-  measuring.init();
+#ifdef DEBUG
+#warning "DEBUG IS ENABLED!"
+  Serial.begin(115200);
+  Serial.setDebugOutput(true);
+#endif
 
   lcdMenu.init();
 
-  lcdMenu.println(F("    Iniciando..."), 1, true);
+  lcdMenu.println(F("    Conectando..."), 1, true);
 
   wifiOut.connect();
 
-  tensioner.init();
+  lcdMenu.println(F("    Iniciando..."), 1, true);
+
+  pref.begin(NAMESPACE, false);
+
+  SPI.begin();
+
+  commonsInit();
+
+  aligner.init();
+
+  spooler.init();
+
+  puller.init();
+
+  measuring.init();
 
   rotaryEncoder.init();
 
   pidPuller.init();
 
   pidSpooler.init();
+
+  tensioner.init();
 
   task.initCoreZero();
 

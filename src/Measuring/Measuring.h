@@ -2,6 +2,12 @@
 
 #include <Arduino.h>
 
+#define SERIAL2_TX 17
+#define SERIAL2_RX 18
+
+#define RESET_MCU_PIN 42
+
+#define AUTOSTOP_OUTPUT_PIN 47
 #define AUTOSTOP_ENABLE_THRESHOLD 0.15
 
 #define MEASURING_MODE_PREF "measuringMode"
@@ -18,6 +24,8 @@ class Measuring {
   long lastSendOutMillis;
 
   bool isValidMeasurement(String measurement);
+
+  void restartMCU();
 
  public:
   MeasuringMode mode = measuringManualMode;

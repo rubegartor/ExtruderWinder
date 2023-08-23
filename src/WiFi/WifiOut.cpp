@@ -12,6 +12,8 @@ AsyncWebServer server(80);
 AsyncEventSource events("/events");
 
 void WifiOut::connect() {
+  delay(1500);  // Stabilize power
+
   IPAddress ip(10, 2, 0, 188);
   IPAddress gateway(10, 2, 0, 254);
   IPAddress subnet(255, 255, 255, 0);
@@ -31,9 +33,9 @@ void WifiOut::connect() {
     wifiMulti.addAP(networks[i][0], networks[i][1]);
   }
 
-  while (wifiMulti.run() != WL_CONNECTED && this->retries <= MAX_RETRIES) {
+  while (wifiMulti.run() != WL_CONNECTED && this->retries <= WIFI_MAX_RETRIES) {
     this->retries += 1;
-    delay(1000);
+    delay(500);
   }
 
   if (WiFi.status() == WL_CONNECTED) this->connected = true;
@@ -58,6 +60,13 @@ void WifiOut::startServer() {
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send(SPIFFS, "/index.html", String(), false);
+  });
+
+  server.on("/onStart", HTTP_GET, [](AsyncWebServerRequest* request) {
+    request->send(200, "application/json",
+                  "{\"setPoint\":" + (String)pidPuller.getSetPoint() +
+                      ", \"min\": " + (String)measuring.minRead +
+                      ", \"max\":" + (String)measuring.maxRead + "}");
   });
 
   events.onConnect([](AsyncEventSourceClient* client) {

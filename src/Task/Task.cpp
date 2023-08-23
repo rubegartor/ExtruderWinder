@@ -9,9 +9,9 @@ TaskHandle_t coreZeroTask;
 TaskHandle_t coreOneTask;
 
 void IRAM_ATTR _watchDogFeed() {
-  TIMERG0.wdt_wprotect = TIMG_WDT_WKEY_VALUE;
-  TIMERG0.wdt_feed = 1;
-  TIMERG0.wdt_wprotect = 0;
+  TIMERG0.wdtwprotect.wdt_wkey = TIMG_WDT_WKEY_V;
+  TIMERG0.wdtfeed.wdt_feed = 1;
+  TIMERG0.wdtwprotect.wdt_wkey = 0;
 }
 
 void _coreOneImpl(void* pvParameters) {
@@ -20,12 +20,12 @@ void _coreOneImpl(void* pvParameters) {
   aligner.init();
 
   for (;;) {
-    puller.run();
-    spooler.run();
-    aligner.run();
-
-    if (measuring.autoStopStatus == autoStopTriggered) {
+    if (measuring.autoStopStatus == autoStopTriggered && !disableSound) {
       doAlarm();
+    } else {
+      puller.run();
+      spooler.run();
+      aligner.run();
     }
 
     _watchDogFeed();
@@ -33,16 +33,57 @@ void _coreOneImpl(void* pvParameters) {
 }
 
 void _coreZeroImpl(void* pvParameters) {
-  BlockNot readTensioner(200);
+  BlockNot readTensioner(150);
   BlockNot updateSummary(500);
-  BlockNot updateWifiEvents(500);
+  BlockNot updateWifiEvents(1000);
 
   for (;;) {
-    delay(5);
+    if (aligner.alignerActualStatus != alignerPositioned) {
+      delay(5);  // No delay = Core 0 crash
+    }
+
+    if (task.initSummary) {
+      lcdMenu.initSummary(true);
+
+      task.initSummary = false;
+    }
+
+    if (task.printStartPos) {
+      lcdMenu.println(" Elige el inicio de", 1, true);
+      lcdMenu.println("     la bobina", 2);
+
+      task.printStartPos = false;
+    }
+
+    if (task.printEndPos) {
+      lcdMenu.println(" Elige el final de", 1, true);
+      lcdMenu.println("     la bobina", 2);
+
+      task.printEndPos = false;
+    }
+
+    if (updateWifiEvents.TRIGGERED) wifiOut.handleEvents();
+
+#ifdef ALIGNER_SPI
+    if (aligner.isHomed() && !aligner.isEnabled(true)) {
+      alignerDriverErrorCount++;
+
+#ifdef DEBUG
+      Serial.println("[" + (String)millis() + "] Restarting aligner driver...");
+#endif
+    }
+#endif
+
+#ifdef SPOOLER_SPI
+    if (aligner.isHomed() && !spooler.isEnabled(true)) {
+      spoolDriverErrorCount++;
+#ifdef DEBUG
+      Serial.println("[" + (String)millis() + "] Restarting spooler driver...");
+#endif
+    }
+#endif
 
     spooler.speed = pidSpooler.computeSpeed();
-
-    if (updateWifiEvents.TRIGGERED && wifiOut.connected) wifiOut.handleEvents();
 
     if (aligner.isHomed()) {
       measuring.read();
@@ -52,28 +93,27 @@ void _coreZeroImpl(void* pvParameters) {
       puller.speed = pidPuller.computeSpeed();
     }
 
-    if (aligner.isHomed() && updateSummary.TRIGGERED) {
-      if (lcdMenu.inSummary) {
-        lcdMenu.initSummary();
-      }
+    if (aligner.isHomed() && updateSummary.TRIGGERED && lcdMenu.inSummary) {
+      lcdMenu.initSummary();
     }
 
     if (aligner.isHomed() && aligner.alignerActualStatus != alignerStart) {
+      // No delay when inside lcd menu = Core 0 crash
+      delay(5);
+
       if (rotaryEncoder.changed()) {
         lcdMenu.onREncoderChange(rotaryEncoder);
       }
 
       if (rotaryEncoder.clicked()) {
-        lcdMenu.onREncoderClick(rotaryEncoder);
-      }
+        if (measuring.autoStopStatus == autoStopTriggered) disableSound = true;
 
-      if (lcdMenu.menuPosition == pullerSpeedOption) {
-        lcdMenu.checkLCDButtons();
+        lcdMenu.onREncoderClick(rotaryEncoder);
       }
     }
 
-    if (isReady()) {
-      if (readTensioner.TRIGGERED) tensioner.getDistance();
+    if (isReady() && readTensioner.TRIGGERED) {
+      tensioner.run();
     }
 
     _watchDogFeed();
@@ -84,7 +124,7 @@ void Task::initCoreZero() {
   xTaskCreatePinnedToCore(
       _coreZeroImpl,  /* Task function. */
       "coreZeroTask", /* name of task. */
-      50000,          /* Stack size of task */
+      10000,          /* Stack size of task */
       NULL,           /* parameter of the task */
       10,             /* priority of the task */
       &coreZeroTask,  /* Task handle to keep track of created task */

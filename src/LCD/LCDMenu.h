@@ -7,10 +7,12 @@
 
 #define MENU_OPTIONS_NUMBER 6
 #define MENU_MAX_OPTIONS_SHOWED 4
-#define MENU_CONFIG_OPTIONS_NUMBER 7
+#define MENU_CONFIG_OPTIONS_NUMBER 10
 
 #define LCD_ADRRESS 0x27
 #define LCD_BUFFER 20
+
+#define LCD_BLANK_LINE "                    "
 
 enum MenuOption {
   summaryOption,
@@ -28,7 +30,10 @@ enum ConfigSubMenuOption {
   autoStopOption,
   targetDiameterOption,
   minPullerSpeedOption,
-  maxPullerSpeedOption
+  maxPullerSpeedOption,
+  startPosAlignerOption,
+  endPosAlignerOption,
+  manualMoveAlignerOption,
 };
 
 class LCDMenu {
@@ -55,6 +60,8 @@ class LCDMenu {
 
   void setSpeedButtonUnderscore();
 
+  void selectOption(uint8_t option);
+
   MenuOption nextItem();
 
   MenuOption prevItem();
@@ -65,6 +72,8 @@ class LCDMenu {
   bool inSummary;
 
   void init();
+
+  void clear();
 
   void initSummary(bool clear = false);
 

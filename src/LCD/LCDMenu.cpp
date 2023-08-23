@@ -34,7 +34,8 @@ const char *optionsStr[MENU_OPTIONS_NUMBER] = {
 const char *configOptionsStr[MENU_CONFIG_OPTIONS_NUMBER] = {
     "Volver al menu     ", "Modo:              ", "Material:          ",
     "Auto stop:         ", "Diametro:          ", "Puller min:        ",
-    "Puller max:        "};
+    "Puller max:        ", "Start pos:         ", "End pos:           ",
+    "Manual move        "};
 
 const int speeds[4] = {5, 10, 100, 500};
 const int speedsPositions[4] = {2, 5, 9, 14};  // LCD cursor positions
@@ -63,8 +64,18 @@ void LCDMenu::init() {
   LCDMenu::inSummary = true;
 }
 
+void LCDMenu::clear() {
+  for (uint8_t i = 0; i < MENU_MAX_OPTIONS_SHOWED; i++) {
+    lcd.setCursor(0, i);
+    lcd.print(LCD_BLANK_LINE);
+  }
+}
+
 void LCDMenu::initSummary(bool clear) {
-  if (clear) lcd.clear();
+  if (clear) {
+    this->clear();
+    delay(250);
+  }
 
   this->inSummary = true;
   this->menuPosition = summaryOption;
@@ -105,7 +116,7 @@ void LCDMenu::initSummary(bool clear) {
 }
 
 void LCDMenu::initMenu(MenuOption option, bool clear) {
-  if (clear) lcd.clear();
+  if (clear) this->clear();
 
   uint8_t row = (uint8_t)option;
 
@@ -158,7 +169,7 @@ void LCDMenu::initMenu(MenuOption option, bool clear) {
 }
 
 void LCDMenu::println(String text, uint8_t row, bool clear) {
-  if (clear) lcd.clear();
+  if (clear) this->clear();
 
   String emptyChars;
   uint8_t emptyFill = LCD_BUFFER - text.length();
@@ -172,7 +183,7 @@ void LCDMenu::println(String text, uint8_t row, bool clear) {
 }
 
 void LCDMenu::confirmationMenu(String message) {
-  lcd.clear();
+  this->clear();
 
   lcd.setCursor(0, 0);
   lcd.print(message);
@@ -187,7 +198,7 @@ void LCDMenu::confirmationMenu(String message) {
 }
 
 void LCDMenu::pullerSpeedSubMenu() {
-  lcd.clear();
+  this->clear();
 
   if (measuring.mode == measuringAutoMode) {
     lcd.setCursor(1, 1);
@@ -213,7 +224,7 @@ void LCDMenu::pullerSpeedSubMenu() {
 }
 
 void LCDMenu::configSubMenu(bool clear) {
-  if (clear) lcd.clear();
+  if (clear) this->clear();
 
   uint8_t row = (uint8_t)this->configSubMenuOption;
 
@@ -270,6 +281,10 @@ void LCDMenu::configSubMenu(bool clear) {
       } else {
         newLine = "                  ";
       }
+    } else if (strOpt.startsWith("Start pos")) {
+      newLine = "Start pos: " + (String)aligner.startPos;
+    } else if (strOpt.startsWith("End pos")) {
+      newLine = "End pos: " + (String)aligner.endPos;
     } else {
       newLine = strOpt;
     }
@@ -290,13 +305,17 @@ void LCDMenu::configSubMenu(bool clear) {
 }
 
 void LCDMenu::infoSubMenu() {
-  lcd.clear();
+  this->clear();
 
   lcd.setCursor(0, 0);
-  lcd.print("IP: " + (String)(wifiOut.connected ? wifiOut.ipAddr : "Sin conexion"));
+  lcd.print("IP: " +
+            (String)(wifiOut.connected ? wifiOut.ipAddr : "Sin conexion"));
 
   lcd.setCursor(0, 1);
-  lcd.print("AVG: " + (String)measuring.average() + " mm");
+  lcd.print("Tensioner: " + (String)tensioner.lastRead);
+
+  lcd.setCursor(0, 2);
+  lcd.print("Al Err: " + (String)alignerDriverErrorCount);
 }
 
 bool LCDMenu::inConfigSubMenuOptions() {
@@ -333,7 +352,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
     uint16_t minPullerSpeed =
         pref.getUInt(MIN_PULLER_SPEED_PREF, MIN_PULLER_SPEED_DEFAULT);
 
-    minPullerSpeed += (rEncoder.direction == increased) ? 1 : -1;
+    minPullerSpeed += (rEncoder.direction == increased) ? 50 : -50;
 
     pidPuller.updateMinPullerSpeed(minPullerSpeed);
 
@@ -354,7 +373,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
     uint16_t maxPullerSpeed =
         pref.getUInt(MAX_PULLER_SPEED_PREF, MAX_PULLER_SPEED_DEFAULT);
 
-    maxPullerSpeed += (rEncoder.direction == increased) ? 1 : -1;
+    maxPullerSpeed += (rEncoder.direction == increased) ? 50 : -50;
 
     pidPuller.updateMaxPullerSpeed(maxPullerSpeed);
 
@@ -387,6 +406,58 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
     for (uint8_t j; j < fillSpaces; j++) {
       lcd.print(" ");
     }
+
+    return;
+  }
+
+  if (this->inConfigSubMenuOptions() &&
+      this->configSubMenuOptionSelected == startPosAlignerOption) {
+    uint16_t startPos = aligner.startPos;
+    long stepsToGo = STEPS_PER_CM * (filamentDiameter / 10);
+
+    startPos += (rEncoder.direction == increased) ? stepsToGo : -stepsToGo;
+
+    aligner.startPos = startPos;
+
+    lcd.setCursor(12, MENU_MAX_OPTIONS_SHOWED - 1);
+    lcd.print(aligner.startPos);
+
+    // Rellenar con espacios
+    uint8_t fillSpaces = LCD_BUFFER - 12 - ((String)startPos).length();
+    for (uint8_t j; j < fillSpaces; j++) {
+      lcd.print(" ");
+    }
+
+    return;
+  }
+
+  if (this->inConfigSubMenuOptions() &&
+      this->configSubMenuOptionSelected == endPosAlignerOption) {
+    uint16_t endPos = aligner.endPos;
+    long stepsToGo = STEPS_PER_CM * (filamentDiameter / 10);
+
+    endPos += (rEncoder.direction == increased) ? stepsToGo : -stepsToGo;
+
+    aligner.endPos = endPos;
+
+    lcd.setCursor(10, MENU_MAX_OPTIONS_SHOWED - 1);
+    lcd.print(aligner.endPos);
+
+    // Rellenar con espacios
+    uint8_t fillSpaces = LCD_BUFFER - 10 - ((String)endPos).length();
+    for (uint8_t j; j < fillSpaces; j++) {
+      lcd.print(" ");
+    }
+
+    return;
+  }
+
+  if (this->inConfigSubMenuOptions() &&
+      this->configSubMenuOptionSelected == manualMoveAlignerOption) {
+    long stepsToGo = STEPS_PER_CM * (filamentDiameter / 10);
+    if (rEncoder.direction == decreased) stepsToGo = -stepsToGo;
+
+    aligner.moveTo(stepsToGo);
 
     return;
   }
@@ -442,7 +513,7 @@ void IRAM_ATTR LCDMenu::onREncoderChange(REncoder rEncoder) {
         uint8_t omitOptions = 0;
 
         if (measuring.mode == measuringManualMode) {
-          omitOptions = 4;
+          omitOptions = 7;
         }
 
         for (uint8_t i = 0; i < MENU_MAX_OPTIONS_SHOWED; i++) {
@@ -503,59 +574,14 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
     return;
   }
 
-  if (this->configSubMenuOption == targetDiameterOption) {
-    lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
-
-    if (this->configSubMenuOptionSelected != targetDiameterOption) {
-      this->configSubMenuOptionSelected = targetDiameterOption;
-      lcd.write(byte(4));
-    } else {
-      this->configSubMenuOptionSelected = returnConfigOption;
-      lcd.write(byte(0));
-    }
-
-    return;
-  }
-
-  if (this->configSubMenuOption == minPullerSpeedOption) {
-    lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
-
-    if (this->configSubMenuOptionSelected != minPullerSpeedOption) {
-      this->configSubMenuOptionSelected = minPullerSpeedOption;
-      lcd.write(byte(4));
-    } else {
-      this->configSubMenuOptionSelected = returnConfigOption;
-      lcd.write(byte(0));
-    }
-
-    return;
-  }
-
-  if (this->configSubMenuOption == maxPullerSpeedOption) {
-    lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
-
-    if (this->configSubMenuOptionSelected != maxPullerSpeedOption) {
-      this->configSubMenuOptionSelected = maxPullerSpeedOption;
-      lcd.write(byte(4));
-    } else {
-      this->configSubMenuOptionSelected = returnConfigOption;
-      lcd.write(byte(0));
-    }
-
-    return;
-  }
-
-  if (this->configSubMenuOption == autoStopOption) {
-    lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
-
-    if (this->configSubMenuOptionSelected != autoStopOption) {
-      this->configSubMenuOptionSelected = autoStopOption;
-      lcd.write(byte(4));
-    } else {
-      this->configSubMenuOptionSelected = returnConfigOption;
-      lcd.write(byte(0));
-    }
-
+  if (this->configSubMenuOption == targetDiameterOption ||
+      this->configSubMenuOption == minPullerSpeedOption ||
+      this->configSubMenuOption == maxPullerSpeedOption ||
+      this->configSubMenuOption == autoStopOption ||
+      this->configSubMenuOption == startPosAlignerOption ||
+      this->configSubMenuOption == endPosAlignerOption ||
+      this->configSubMenuOption == manualMoveAlignerOption) {
+    this->selectOption(this->configSubMenuOption);
     return;
   }
 
@@ -593,6 +619,7 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
     if (this->continueMenu) {
       puller.totalRevs = 0;
       spooler.totalRevs = 0;
+      aligner.lastTotalRevs = 0;
       millisOffset = millis();
       measuring.reset();
       this->initSummary(true);
@@ -662,6 +689,18 @@ void LCDMenu::onREncoderClick(REncoder rEncoder) {
         this->infoSubMenu();
         break;
     }
+  }
+}
+
+void LCDMenu::selectOption(uint8_t option) {
+  lcd.setCursor(0, MENU_MAX_OPTIONS_SHOWED - 1);
+
+  if (this->configSubMenuOptionSelected != (ConfigSubMenuOption)option) {
+    this->configSubMenuOptionSelected = (ConfigSubMenuOption)option;
+    lcd.write(byte(4));
+  } else {
+    this->configSubMenuOptionSelected = returnConfigOption;
+    lcd.write(byte(0));
   }
 }
 
