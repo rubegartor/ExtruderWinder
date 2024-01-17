@@ -31,6 +31,10 @@ class PIDPuller {
 
   void updateSetPoint(float setPoint);
 
+  uint16_t getMinPullerSpeed();
+
+  uint16_t getMaxPullerSpeed();
+
   void updateMinPullerSpeed(uint16_t speed);
 
   void updateMaxPullerSpeed(uint16_t speed);

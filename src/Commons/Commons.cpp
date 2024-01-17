@@ -4,14 +4,13 @@ Preferences pref;
 Aligner aligner;
 Spooler spooler;
 Puller puller;
-WifiOut wifiOut;
+Communication communication;
 Measuring measuring;
-LCDMenu lcdMenu;
-REncoder rotaryEncoder;
 PIDPuller pidPuller;
 PIDSpooler pidSpooler;
 Task task;
 Tensioner tensioner;
+Cooler cooler;
 
 Polymer ABS;
 Polymer PLA;
@@ -27,15 +26,12 @@ float filamentDiameter = DEFAULT_FILAMENT_DIAMETER;
 ulong millisOffset = 0;
 Polymer polymers[POLYMER_NUMBER];
 
-long alignerDriverErrorCount = 0;
-long spoolDriverErrorCount = 0;
-
 Polymer stringToPolymer(String polymerName) {
   if (polymerName == "PLA") return polymers[0];
   if (polymerName == "ABS") return polymers[1];
-  if (polymerName == "TPU-80") return polymers[2];
-  if (polymerName == "TPU-85") return polymers[3];
-  if (polymerName == "TPU-90") return polymers[4];
+  if (polymerName == "TPU (80A)") return polymers[2];
+  if (polymerName == "TPU (85A)") return polymers[3];
+  if (polymerName == "TPU (90A)") return polymers[4];
   if (polymerName == "PETG") return polymers[5];
   if (polymerName == "PC/ABS") return polymers[6];
   if (polymerName == "Otro") return polymers[7];
@@ -52,15 +48,15 @@ void initPolymers() {
   ABS.weight = 2.45f;
   polymers[1] = ABS;
 
-  TPU80.name = "TPU-80";
+  TPU80.name = "TPU (80A)";
   TPU80.weight = 3.26f;
   polymers[2] = TPU80;
 
-  TPU85.name = "TPU-85";
+  TPU85.name = "TPU (85A)";
   TPU85.weight = 3.26f;
   polymers[3] = TPU85;
 
-  TPU90.name = "TPU-90";
+  TPU90.name = "TPU (90A)";
   TPU90.weight = 3.52f;
   polymers[4] = TPU90;
 
@@ -79,6 +75,7 @@ void initPolymers() {
 
 void commonsInit() {
   pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
 
   pinMode(DEFAULT_SPI_DIR_PIN, OUTPUT);
   digitalWrite(DEFAULT_SPI_DIR_PIN, LOW);
@@ -99,14 +96,6 @@ String getTime(unsigned long millis) {
   char time_str[9];
   sprintf(time_str, "%02d:%02d:%02d", hours, minutes, seconds);
   return String(time_str);
-}
-
-void doBeep() {
-  if (measuring.autoStopStatus == autoStopTriggered) return;
-
-  digitalWrite(BUZZER_PIN, HIGH);
-  delay(5);
-  digitalWrite(BUZZER_PIN, LOW);
 }
 
 void doAlarm() {
@@ -132,7 +121,7 @@ float getExtrudedLength() {
 }
 
 float getExtrudedWeight() {
-  Polymer actualPolymer = stringToPolymer(polymers[0].name);
+  Polymer actualPolymer = stringToPolymer(pref.getString(SELECTED_POLYMER_PREF, polymers[0].name));
 
   return getExtrudedLength() * ruleOfThree(DEFAULT_FILAMENT_DIAMETER,
                                            actualPolymer.weight,

@@ -23,13 +23,11 @@
 #define STALLGUARD_IGNORE 10
 
 // Si el stall value es menor a este número se considera el stall
-#define STALLGUARD_THRESHOLD 80
+#define STALLGUARD_THRESHOLD 65
 
 enum MotorDirEnum { forward, backward };
 
 enum AlignerStatus { alignerNoStatus, alignerStart, alignerPositioned };
-
-enum AlignerMoveType { autoAligner, manualAligner };
 
 class Aligner {
  private:
@@ -43,15 +41,11 @@ class Aligner {
   bool isEndPosSet;
   int16_t preStartPos;
 
-  AlignerMoveType alignerMoveType;
-
   void configDriver();
-
-  bool isInPosition();
 
   uint16_t getStallValue();
 
-  long calculateStepsForNextAlignerMove(AlignerMoveType type);
+  long calculateStepsForNextAlignerMove();
 
   void homeProcess();
 
@@ -70,11 +64,17 @@ class Aligner {
 
   void startAlignerPosition();
 
+  void setAlignerPosition();
+
   void resetHome();
 
   void moveTo(long pos);
 
+  long getCurrentPosition();
+
   bool isPositioned();
+
+  bool isInPosition();
 
   bool isHomed();
 

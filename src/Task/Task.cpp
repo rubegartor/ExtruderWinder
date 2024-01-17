@@ -34,39 +34,34 @@ void _coreOneImpl(void* pvParameters) {
 
 void _coreZeroImpl(void* pvParameters) {
   BlockNot readTensioner(150);
-  BlockNot updateSummary(500);
-  BlockNot updateWifiEvents(1000);
+  BlockNot checkMeasuringPingTimeout(150);
+  BlockNot updateWifiTaskedEvents(500);
+  BlockNot updateWifiFastTaskedEvents(100);
+  BlockNot updateTemperatureSensor(5000);
+  BlockNot requestFromScreen(5);
 
   for (;;) {
-    if (aligner.alignerActualStatus != alignerPositioned) {
-      delay(5);  // No delay = Core 0 crash
+    delay(5);
+
+    if (updateTemperatureSensor.TRIGGERED) {
+      cooler.refresh();
     }
 
-    if (task.initSummary) {
-      lcdMenu.initSummary(true);
-
-      task.initSummary = false;
+    if (updateWifiTaskedEvents.TRIGGERED) {
+      communication.sendTaskedEvents();
     }
 
-    if (task.printStartPos) {
-      lcdMenu.println(" Elige el inicio de", 1, true);
-      lcdMenu.println("     la bobina", 2);
-
-      task.printStartPos = false;
+    if (requestFromScreen.TRIGGERED) {
+      communication.requestData();
     }
 
-    if (task.printEndPos) {
-      lcdMenu.println(" Elige el final de", 1, true);
-      lcdMenu.println("     la bobina", 2);
-
-      task.printEndPos = false;
+    if (updateWifiFastTaskedEvents.TRIGGERED) {
+      communication.sendFastTaskedEvents();
     }
-
-    if (updateWifiEvents.TRIGGERED) wifiOut.handleEvents();
 
 #ifdef ALIGNER_SPI
-    if (aligner.isHomed() && !aligner.isEnabled(true)) {
-      alignerDriverErrorCount++;
+    if (aligner.isHomed()) {
+      aligner.isEnabled(true);
 
 #ifdef DEBUG
       Serial.println("[" + (String)millis() + "] Restarting aligner driver...");
@@ -75,8 +70,8 @@ void _coreZeroImpl(void* pvParameters) {
 #endif
 
 #ifdef SPOOLER_SPI
-    if (aligner.isHomed() && !spooler.isEnabled(true)) {
-      spoolDriverErrorCount++;
+    if (aligner.isHomed()) {
+      spooler.isEnabled(true);
 #ifdef DEBUG
       Serial.println("[" + (String)millis() + "] Restarting spooler driver...");
 #endif
@@ -87,33 +82,16 @@ void _coreZeroImpl(void* pvParameters) {
 
     if (aligner.isHomed()) {
       measuring.read();
-    }
 
-    if (aligner.isHomed() && measuring.mode == measuringAutoMode) {
       puller.speed = pidPuller.computeSpeed();
-    }
-
-    if (aligner.isHomed() && updateSummary.TRIGGERED && lcdMenu.inSummary) {
-      lcdMenu.initSummary();
-    }
-
-    if (aligner.isHomed() && aligner.alignerActualStatus != alignerStart) {
-      // No delay when inside lcd menu = Core 0 crash
-      delay(5);
-
-      if (rotaryEncoder.changed()) {
-        lcdMenu.onREncoderChange(rotaryEncoder);
-      }
-
-      if (rotaryEncoder.clicked()) {
-        if (measuring.autoStopStatus == autoStopTriggered) disableSound = true;
-
-        lcdMenu.onREncoderClick(rotaryEncoder);
-      }
     }
 
     if (isReady() && readTensioner.TRIGGERED) {
       tensioner.run();
+    }
+
+    if (checkMeasuringPingTimeout.TRIGGERED) {
+      measuring.checkPingTimeout();
     }
 
     _watchDogFeed();

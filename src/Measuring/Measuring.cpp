@@ -10,9 +10,6 @@ void Measuring::init() {
 
   pinMode(RESET_MCU_PIN, OUTPUT);
   digitalWrite(RESET_MCU_PIN, HIGH);
-
-  this->mode =
-      (MeasuringMode)pref.getUInt(MEASURING_MODE_PREF, measuringManualMode);
 }
 
 bool Measuring::isValidMeasurement(String measurement) {
@@ -26,6 +23,10 @@ float Measuring::read() {
     read = Serial2.readStringUntil('\r');
     read.trim();
 
+    if (read.startsWith("P")) {
+      this->lastPingMillis = millis();
+    }
+
     if (this->isValidMeasurement(read)) {
       float value = atof(read.c_str());
 
@@ -34,18 +35,14 @@ float Measuring::read() {
       if (measuring.autoStopStatus == autoStopEnabled &&
           (millis() - millisOffset) > 1500 &&
           abs(this->lastRead - value) > 1.0f) {
-#ifdef DEBUG
-        Serial.println("[" + (String)millis() +
-                       "] Restarting measuring MCU...");
-#endif
         this->restartMCU();
 
         return this->lastRead;
       }
 
-      if (millis() - this->lastSendOutMillis > 100 &&
+      if (millis() - this->lastSendOutMillis > 50 &&
           this->autoStopStatus != autoStopTriggered) {
-        wifiOut.putEvent("lastRead", (String)this->lastRead);
+        communication.sendEvent("lastRead", (String)this->lastRead);
         this->lastSendOutMillis = millis();
       }
 
@@ -58,14 +55,14 @@ float Measuring::read() {
   if (this->autoStopStatus != autoStopTriggered) {
     if (this->lastRead < this->minRead) {
       this->minRead = this->lastRead;
-      wifiOut.putEvent("minRead", (String)this->minRead);
+      communication.sendEvent("minRead", (String)this->minRead);
     } else if (this->lastRead > this->maxRead) {
       this->maxRead = this->lastRead;
-      wifiOut.putEvent("maxRead", (String)this->maxRead);
+      communication.sendEvent("maxRead", (String)this->maxRead);
     }
   }
 
-  if (this->mode == measuringAutoMode && this->autoStopStatus != autoStopTriggered) {
+  if (this->autoStopStatus != autoStopTriggered) {
     float autoStopThr =
         pref.getFloat(AUTOSTOP_THRESHOLD_PREF, AUTOSTOP_THRESHOLD_DEFAULT);
 
@@ -73,6 +70,7 @@ float Measuring::read() {
 
     if (this->autoStopStatus == autoStopEnabled && gap > autoStopThr) {
       this->autoStopStatus = autoStopTriggered;
+      communication.sendEvent("stAutoStop", (String)this->autoStopStatus);
 
       // Detener el extrusor si se lanza el autoStop (activar optoacoplador)
       digitalWrite(AUTOSTOP_OUTPUT_PIN, HIGH);
@@ -97,11 +95,14 @@ float Measuring::average() {
 void Measuring::reset() {
   // Si el margen de error entre el setPoint y la lectura actual es mayor a
   // AUTOSTOP_ENABLE_THRESHOLD se activa el autoStop
-  double gap =
-      abs(pidPuller.getSetPoint() - this->lastRead) - pidPuller.getSetPoint();
+  if (this->lastRead >= pidPuller.getSetPoint() - AUTOSTOP_ENABLE_THRESHOLD && this->lastRead <= pidPuller.getSetPoint() + AUTOSTOP_ENABLE_THRESHOLD) {
+    double gap =
+        abs(pidPuller.getSetPoint() - this->lastRead) - pidPuller.getSetPoint();
 
-  if (abs(gap) > AUTOSTOP_ENABLE_THRESHOLD) {
-    this->autoStopStatus = autoStopEnabled;
+    if ((abs(gap) - pidPuller.getSetPoint()) <= AUTOSTOP_ENABLE_THRESHOLD) {
+      this->autoStopStatus = autoStopEnabled;
+      communication.sendEvent("stAutoStop", (String)this->autoStopStatus);
+    }
   }
 
   this->minRead = this->lastRead;
@@ -110,27 +111,28 @@ void Measuring::reset() {
   this->readValueNum = 0;
   this->readValueSum = 0;
 
-  wifiOut.putEvent("minRead", (String)this->minRead);
-  wifiOut.putEvent("maxRead", (String)this->minRead);
-  wifiOut.putEvent("reset", "");
+  communication.sendEvent("minRead", (String)this->minRead);
+  communication.sendEvent("maxRead", (String)this->minRead);
 }
 
 void Measuring::restartMCU() {
+#ifdef DEBUG
+  Serial.println("[" + (String)millis() +
+                  "] Restarting measuring MCU...");
+#endif
+
   digitalWrite(RESET_MCU_PIN, LOW);
+  digitalWrite(BUZZER_PIN, HIGH);
   delay(10);
   digitalWrite(RESET_MCU_PIN, HIGH);
+  digitalWrite(BUZZER_PIN, LOW);
+
+  this->lastPingMillis = millis();
 }
 
-String Measuring::measuringModeString() {
-  String measuringModeString = "";
-
-  if (this->mode == measuringAutoMode) {
-    measuringModeString = "Auto  ";
+void Measuring::checkPingTimeout() {
+  if (millis() - this->lastPingMillis >= SERIAL2_RESPONSE_TIMEOUT) {
+    Serial2.flush();
+    this->restartMCU();
   }
-
-  if (this->mode == measuringManualMode) {
-    measuringModeString = "Manual";
-  }
-
-  return measuringModeString;
 }

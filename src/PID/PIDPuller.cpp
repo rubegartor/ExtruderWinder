@@ -24,8 +24,14 @@ double PIDPuller::getSetPoint() { return this->setPoint; }
 
 void PIDPuller::updateSetPoint(float setPoint) {
   this->setPoint = setPoint;
+}
 
-  wifiOut.putEvent("setPoint", (String)this->setPoint);
+uint16_t PIDPuller::getMinPullerSpeed() {
+  return pref.getUInt(MIN_PULLER_SPEED_PREF);
+}
+
+uint16_t PIDPuller::getMaxPullerSpeed() {
+  return pref.getUInt(MAX_PULLER_SPEED_PREF);
 }
 
 void PIDPuller::updateMinPullerSpeed(uint16_t speed) {

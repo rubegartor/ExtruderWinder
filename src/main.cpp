@@ -9,15 +9,9 @@ void setup() {
   Serial.setDebugOutput(true);
 #endif
 
-  lcdMenu.init();
-
-  lcdMenu.println(F("    Conectando..."), 1, true);
-
-  wifiOut.connect();
-
-  lcdMenu.println(F("    Iniciando..."), 1, true);
-
   pref.begin(NAMESPACE, false);
+
+  communication.init();
 
   SPI.begin();
 
@@ -31,13 +25,13 @@ void setup() {
 
   measuring.init();
 
-  rotaryEncoder.init();
-
   pidPuller.init();
 
   pidSpooler.init();
 
   tensioner.init();
+
+  cooler.init();
 
   task.initCoreZero();
 

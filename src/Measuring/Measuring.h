@@ -5,30 +5,28 @@
 #define SERIAL2_TX 17
 #define SERIAL2_RX 18
 
+#define SERIAL2_RESPONSE_TIMEOUT 5000
+
 #define RESET_MCU_PIN 42
 
 #define AUTOSTOP_OUTPUT_PIN 47
 #define AUTOSTOP_ENABLE_THRESHOLD 0.15
 
-#define MEASURING_MODE_PREF "measuringMode"
-
 #define AUTOSTOP_THRESHOLD_PREF "autoStopThr"
 #define AUTOSTOP_THRESHOLD_DEFAULT 0.2f
-
-enum MeasuringMode { measuringAutoMode, measuringManualMode };
 
 enum AutoStopStatus { autoStopEnabled, autoStopDisabled, autoStopTriggered };
 
 class Measuring {
  private:
   long lastSendOutMillis;
+  long lastPingMillis;
 
   bool isValidMeasurement(String measurement);
 
   void restartMCU();
 
  public:
-  MeasuringMode mode = measuringManualMode;
   AutoStopStatus autoStopStatus = autoStopDisabled;
   float readValueSum = 0.00f;
   uint32_t readValueNum = 0;
@@ -44,5 +42,5 @@ class Measuring {
 
   void reset();
 
-  String measuringModeString();
+  void checkPingTimeout();
 };

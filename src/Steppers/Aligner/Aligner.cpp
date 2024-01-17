@@ -43,25 +43,74 @@ void Aligner::init() {
 }
 
 void Aligner::startAlignerPosition() {
+  if (alignerMotor.currentPosition() != ALIGNER_START_POSITION) {
+    this->resetHome();
+  }
+
   this->isStartPosSet = false;
   this->isEndPosSet = false;
   this->preStartPos = 0;
   this->endPos = 0;
   this->alignerActualStatus = alignerStart;
+}
 
-  task.printStartPos = true;
+void Aligner::setAlignerPosition() {
+  if (this->isStartPosSet && !this->isEndPosSet) {
+    this->isEndPosSet = true;
+    this->endPos = alignerMotor.currentPosition();
+    this->alignerActualStatus = alignerPositioned;
+
+    alignerMotor.moveTo(ALIGNER_START_POSITION);
+    alignerMotor.setSpeed(1500);
+
+    communication.sendEvent("maxPosition", (String)this->endPos);
+  }
+
+  if (!this->isStartPosSet) {
+    this->isStartPosSet = true;
+    this->preStartPos = alignerMotor.currentPosition();
+    this->startPos = ALIGNER_START_POSITION;
+    alignerMotor.setCurrentPosition(ALIGNER_START_POSITION);
+
+    communication.sendEvent("minPosition", (String)this->startPos);
+  }
 }
 
 void Aligner::resetHome() {
   alignerMotor.setPinsInverted(false, false, false);
+
+  if (alignerMotor.currentPosition() > this->startPos) {
+    this->invertedPins = false;
+  } else if (motorDir == backward) {
+    this->invertedPins = false;
+  } else {
+    this->invertedPins = true;
+  }
+
   this->homed = false;
   this->ignoreStallNum = 0;
-  this->invertedPins = true;
 }
 
 void Aligner::moveTo(long pos) {
-  alignerMotor.moveTo(alignerMotor.currentPosition() + pos);
-  alignerMotor.setSpeed(1250);
+  bool canMove = false;
+  long stepsToGo = alignerMotor.currentPosition() + pos;
+
+  if (!this->isPositioned() && stepsToGo >= ALIGNER_START_POSITION &&
+      abs(stepsToGo + this->preStartPos) <= abs(ALIGNER_MAX_DISTANCE)) {
+    canMove = true;
+  } else if (this->isPositioned() && stepsToGo >= this->startPos &&
+      abs(stepsToGo) <= abs(this->endPos)) {
+    canMove = true;
+  }
+
+  if (canMove) {
+    alignerMotor.moveTo(stepsToGo);
+    alignerMotor.setSpeed(1250);
+  }
+}
+
+long Aligner::getCurrentPosition() {
+  return alignerMotor.currentPosition();
 }
 
 bool Aligner::isInPosition() {
@@ -75,42 +124,10 @@ void Aligner::run() {
     homeProcess();
   }
 
-  if (this->homed && this->alignerActualStatus == alignerStart) {
-    if (this->isInPosition()) {
-      if (rotaryEncoder.changed()) {
-        alignerMotor.moveTo(
-            this->calculateStepsForNextAlignerMove(manualAligner));
-        alignerMotor.setSpeed(800);
-      }
-
-      if (rotaryEncoder.clicked()) {
-        if (this->isStartPosSet && !this->isEndPosSet) {
-          this->isEndPosSet = true;
-          this->endPos = alignerMotor.currentPosition();
-          this->alignerActualStatus = alignerPositioned;
-
-          alignerMotor.moveTo(ALIGNER_START_POSITION);
-          alignerMotor.setSpeed(1500);
-
-          task.initSummary = true;
-        }
-
-        if (!this->isStartPosSet) {
-          this->isStartPosSet = true;
-          this->preStartPos = alignerMotor.currentPosition();
-          this->startPos = ALIGNER_START_POSITION;
-          alignerMotor.setCurrentPosition(ALIGNER_START_POSITION);
-
-          task.printEndPos = true;
-        }
-      }
-    }
-  }
-
   if (isReady()) {
     if (spooler.totalRevs > this->lastTotalRevs) {
       this->lastTotalRevs = spooler.totalRevs;
-      alignerMotor.moveTo(this->calculateStepsForNextAlignerMove(autoAligner));
+      alignerMotor.moveTo(this->calculateStepsForNextAlignerMove());
       alignerMotor.setSpeed(1250);
     }
   }
@@ -126,26 +143,14 @@ void Aligner::run() {
  * Método que mueve el alineador automaticamente cuando se completa una
  * revolucion del winder, corrige automaticamente la dirección
  */
-long Aligner::calculateStepsForNextAlignerMove(AlignerMoveType type) {
+long Aligner::calculateStepsForNextAlignerMove() {
   long stepsToGo = (STEPS_PER_CM * (filamentDiameter / 10));
 
-  if (type == manualAligner) {
-    if (rotaryEncoder.direction == decreased) stepsToGo = -stepsToGo;
-
-    stepsToGo = alignerMotor.currentPosition() + stepsToGo;
-
-    if (stepsToGo >= ALIGNER_START_POSITION &&
-        abs(stepsToGo + this->preStartPos) <= abs(ALIGNER_MAX_DISTANCE)) {
-      return stepsToGo;
-    }
-
-    return alignerMotor.currentPosition();
-  } else {
-    if (alignerMotor.currentPosition() >= this->endPos) {
+  if (alignerMotor.currentPosition() >= this->endPos) {
       motorDir = backward;
     }
 
-    if (alignerMotor.currentPosition() <= ALIGNER_START_POSITION) {
+    if (alignerMotor.currentPosition() <= this->startPos) {
       motorDir = forward;
     }
 
@@ -154,7 +159,6 @@ long Aligner::calculateStepsForNextAlignerMove(AlignerMoveType type) {
     }
 
     return alignerMotor.currentPosition() + stepsToGo;
-  }
 }
 
 uint16_t Aligner::getStallValue() {

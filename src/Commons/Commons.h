@@ -1,27 +1,26 @@
 #pragma once
 
 #include <Arduino.h>
-#include <LCD/LCDMenu.h>
 #include <Measuring/Measuring.h>
 #include <PID/PIDPuller.h>
 #include <PID/PIDSPooler.h>
-#include <RotaryEncoder/RotaryEncoder.h>
 #include <Steppers/Aligner/Aligner.h>
 #include <Steppers/Puller/Puller.h>
-#include <WiFi/WifiOut.h>
+#include <Communication/Communication.h>
 #include <Steppers/Spooler/Spooler.h>
 #include <Task/Task.h>
 #include <Tensioner/Tensioner.h>
+#include <Cooler/Cooler.h>
 #include <Preferences.h>
 
-#define STALLGUARD_SENSITIVITY 10
+#define STALLGUARD_SENSITIVITY 6
 
 #define SPI_MOSI 11
 #define SPI_MISO 13
 #define SPI_SCK 12
 
 #define BUZZER_PIN 19
-#define DEFAULT_SPI_DIR_PIN 1
+#define DEFAULT_SPI_DIR_PIN 10
 
 #define STEPPER_DEF_STEPS 200
 
@@ -39,13 +38,12 @@ extern Task task;
 extern Aligner aligner;
 extern Spooler spooler;
 extern Puller puller;
-extern WifiOut wifiOut;
+extern Communication communication;
 extern Measuring measuring;
-extern LCDMenu lcdMenu;
-extern REncoder rotaryEncoder;
 extern PIDPuller pidPuller;
 extern PIDSpooler pidSpooler;
 extern Tensioner tensioner;
+extern Cooler cooler;
 
 // Global variables
 struct Polymer {
@@ -58,9 +56,6 @@ extern float filamentDiameter;
 extern ulong millisOffset;
 extern Polymer polymers[POLYMER_NUMBER];
 
-extern long alignerDriverErrorCount;
-extern long spoolDriverErrorCount;
-
 void commonsInit();
 
 bool isReady();
@@ -68,8 +63,6 @@ bool isReady();
 Polymer stringToPolymer(String polymerName);
 
 String getTime(unsigned long millis);
-
-void doBeep();
 
 void doAlarm();
 
