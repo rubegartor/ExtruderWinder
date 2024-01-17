@@ -35,8 +35,8 @@ void _coreOneImpl(void* pvParameters) {
 void _coreZeroImpl(void* pvParameters) {
   BlockNot readTensioner(150);
   BlockNot checkMeasuringPingTimeout(150);
-  BlockNot updateWifiTaskedEvents(500);
-  BlockNot updateWifiFastTaskedEvents(100);
+  BlockNot updateTaskedEvents(500);
+  BlockNot updateFastTaskedEvents(100);
   BlockNot updateTemperatureSensor(5000);
   BlockNot requestFromScreen(5);
 
@@ -47,7 +47,7 @@ void _coreZeroImpl(void* pvParameters) {
       cooler.refresh();
     }
 
-    if (updateWifiTaskedEvents.TRIGGERED) {
+    if (updateTaskedEvents.TRIGGERED) {
       communication.sendTaskedEvents();
     }
 
@@ -55,7 +55,7 @@ void _coreZeroImpl(void* pvParameters) {
       communication.requestData();
     }
 
-    if (updateWifiFastTaskedEvents.TRIGGERED) {
+    if (updateFastTaskedEvents.TRIGGERED) {
       communication.sendFastTaskedEvents();
     }
 
