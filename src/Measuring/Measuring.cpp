@@ -19,11 +19,18 @@ bool Measuring::isValidMeasurement(String measurement) {
 float Measuring::read() {
   String read;
 
-  if (Serial2.available() > 0) {
-    read = Serial2.readStringUntil('\r');
-    read.trim();
+  while (Serial2.available()) {
+    char b = (char)Serial2.read();
 
-    if (read.startsWith("P")) {
+    if (b == '\n') break;
+
+    read += b;
+  }
+
+  read.trim();
+
+  if (!read.isEmpty()) {
+    if (read.charAt(0) == 'P') {
       this->lastPingMillis = millis();
     }
 
@@ -40,46 +47,42 @@ float Measuring::read() {
         return this->lastRead;
       }
 
-      if (millis() - this->lastSendOutMillis > 50 &&
-          this->autoStopStatus != autoStopTriggered) {
-        communication.sendEvent("lastRead", (String)this->lastRead);
-        this->lastSendOutMillis = millis();
-      }
+      communication.sendEvent("lastRead", (String)this->lastRead);
 
       this->lastRead = value;
       this->readValueNum++;
       this->readValueSum += this->lastRead;
     }
-  }
 
-  if (this->autoStopStatus != autoStopTriggered) {
-    if (this->lastRead < this->minRead) {
-      this->minRead = this->lastRead;
-      communication.sendEvent("minRead", (String)this->minRead);
-    } else if (this->lastRead > this->maxRead) {
-      this->maxRead = this->lastRead;
-      communication.sendEvent("maxRead", (String)this->maxRead);
+    if (this->autoStopStatus != autoStopTriggered) {
+      if (this->lastRead < this->minRead) {
+        this->minRead = this->lastRead;
+        communication.sendEvent("minRead", (String)this->minRead);
+      } else if (this->lastRead > this->maxRead) {
+        this->maxRead = this->lastRead;
+        communication.sendEvent("maxRead", (String)this->maxRead);
+      }
     }
-  }
 
-  if (this->autoStopStatus != autoStopTriggered) {
-    float autoStopThr =
-        pref.getFloat(AUTOSTOP_THRESHOLD_PREF, AUTOSTOP_THRESHOLD_DEFAULT);
+    if (this->autoStopStatus != autoStopTriggered) {
+      float autoStopThr =
+          pref.getFloat(AUTOSTOP_THRESHOLD_PREF, AUTOSTOP_THRESHOLD_DEFAULT);
 
-    double gap = abs(pidPuller.getSetPoint() - this->lastRead);
+      double gap = abs(pidPuller.getSetPoint() - this->lastRead);
 
-    if (this->autoStopStatus == autoStopEnabled && gap > autoStopThr) {
-      this->autoStopStatus = autoStopTriggered;
-      communication.sendEvent("stAutoStop", (String)this->autoStopStatus);
+      if (this->autoStopStatus == autoStopEnabled && gap > autoStopThr) {
+        this->autoStopStatus = autoStopTriggered;
+        communication.sendEvent("stAutoStop", (String)this->autoStopStatus);
 
-      // Detener el extrusor si se lanza el autoStop (activar optoacoplador)
-      digitalWrite(AUTOSTOP_OUTPUT_PIN, HIGH);
-      delay(250);
-      digitalWrite(AUTOSTOP_OUTPUT_PIN, LOW);
+        // Detener el extrusor si se lanza el autoStop (activar optoacoplador)
+        digitalWrite(AUTOSTOP_OUTPUT_PIN, HIGH);
+        delay(250);
+        digitalWrite(AUTOSTOP_OUTPUT_PIN, LOW);
 
-      Serial.println("Autostop triggered");
-      Serial.println("String: " + read);
-      Serial.println("Conversion: " + (String)this->lastRead);
+        Serial.println("Autostop triggered");
+        Serial.println("String: " + read);
+        Serial.println("Conversion: " + (String)this->lastRead);
+      }
     }
   }
 

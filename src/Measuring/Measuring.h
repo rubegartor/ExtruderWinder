@@ -19,7 +19,6 @@ enum AutoStopStatus { autoStopEnabled, autoStopDisabled, autoStopTriggered };
 
 class Measuring {
  private:
-  long lastSendOutMillis;
   long lastPingMillis;
 
   bool isValidMeasurement(String measurement);

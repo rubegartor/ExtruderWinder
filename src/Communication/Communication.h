@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #define SLAVE_ADDRESS 0x60
+#define BUFFER_SIZE 32
 
 class Communication {
 

@@ -38,25 +38,23 @@ void _coreZeroImpl(void* pvParameters) {
   BlockNot updateTaskedEvents(500);
   BlockNot updateFastTaskedEvents(100);
   BlockNot updateTemperatureSensor(5000);
-  BlockNot requestFromScreen(5);
+  BlockNot requestFromScreen(50);
 
   for (;;) {
-    delay(5);
-
     if (updateTemperatureSensor.TRIGGERED) {
-      cooler.refresh();
+      //cooler.refresh();
     }
 
     if (updateTaskedEvents.TRIGGERED) {
       communication.sendTaskedEvents();
     }
 
-    if (requestFromScreen.TRIGGERED) {
-      communication.requestData();
-    }
-
     if (updateFastTaskedEvents.TRIGGERED) {
       communication.sendFastTaskedEvents();
+    }
+
+    if (requestFromScreen.TRIGGERED) {
+      communication.requestData();
     }
 
 #ifdef ALIGNER_SPI

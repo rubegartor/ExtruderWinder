@@ -11,12 +11,12 @@ struct_message sendingData;
 struct_message incomingData;
 
 void _sendEvent(String eventName, String eventData) {
-  String toSend = "\0";
-
   sendingData.key = eventName;
   sendingData.data = eventData;
 
-  toSend = eventName + ";" + eventData;
+  String toSend = eventName + ";" + eventData;
+
+  if (toSend.length() > BUFFER_SIZE || toSend.length() <= 1) return;
 
   Wire.beginTransmission(0x60);
   Wire.write(toSend.c_str());
@@ -31,7 +31,7 @@ void Communication::sendTaskedEvents() {
   this->sendEvent("pSpeed", String(puller.speed));
   this->sendEvent("eWeight", String(getExtrudedWeight()));
   this->sendEvent("eTime", getTime(millis() - millisOffset));
-  this->sendEvent("temp", String(cooler.read()));
+  this->sendEvent("temp", "NA");
 }
 
 void Communication::sendFastTaskedEvents() {
@@ -48,8 +48,7 @@ void convertToStruct(const String &input, char delimiter) {
 }
 
 void Communication::requestData() {
-  uint8_t bytesReceived = Wire.requestFrom(SLAVE_ADDRESS, 32);
-
+  uint8_t bytesReceived = Wire.requestFrom(SLAVE_ADDRESS, BUFFER_SIZE);
   String read = "";
 
   while (Wire.available()) {
@@ -228,6 +227,7 @@ void Communication::requestData() {
 
 void Communication::init() {
   Wire.begin();
+  Wire.setTimeOut(10);
 
   this->sendEvent("resetScr", "");
 }

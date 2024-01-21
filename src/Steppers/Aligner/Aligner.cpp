@@ -79,7 +79,7 @@ void Aligner::setAlignerPosition() {
 void Aligner::resetHome() {
   alignerMotor.setPinsInverted(false, false, false);
 
-  if (alignerMotor.currentPosition() > this->startPos) {
+  if (alignerMotor.currentPosition() >= this->startPos) {
     this->invertedPins = false;
   } else if (motorDir == backward) {
     this->invertedPins = false;
@@ -147,18 +147,18 @@ long Aligner::calculateStepsForNextAlignerMove() {
   long stepsToGo = (STEPS_PER_CM * (filamentDiameter / 10));
 
   if (alignerMotor.currentPosition() >= this->endPos) {
-      motorDir = backward;
-    }
+    motorDir = backward;
+  }
 
-    if (alignerMotor.currentPosition() <= this->startPos) {
-      motorDir = forward;
-    }
+  if (alignerMotor.currentPosition() <= this->startPos) {
+    motorDir = forward;
+  }
 
-    if (motorDir == backward) {
-      stepsToGo = -(stepsToGo);
-    }
+  if (motorDir == backward) {
+    stepsToGo = -(stepsToGo);
+  }
 
-    return alignerMotor.currentPosition() + stepsToGo;
+  return alignerMotor.currentPosition() + stepsToGo;
 }
 
 uint16_t Aligner::getStallValue() {
@@ -176,12 +176,10 @@ void Aligner::homeProcess() {
 
     if (this->ignoreStallNum < STALLGUARD_IGNORE) {
       this->ignoreStallNum++;
-    } else {
-      if (this->getStallValue() < STALLGUARD_THRESHOLD) {
-        this->homed = true;
-        alignerMotor.setCurrentPosition(ALIGNER_START_POSITION);
-        alignerMotor.setPinsInverted(true, false, false);
-      }
+    } else if (this->getStallValue() < STALLGUARD_THRESHOLD) {
+      this->homed = true;
+      alignerMotor.setCurrentPosition(ALIGNER_START_POSITION);
+      alignerMotor.setPinsInverted(true, false, false);
     }
   }
 }

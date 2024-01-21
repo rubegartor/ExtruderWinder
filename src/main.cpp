@@ -3,11 +3,7 @@
 #include <SPI.h>
 
 void setup() {
-#ifdef DEBUG
-#warning "DEBUG IS ENABLED!"
   Serial.begin(115200);
-  Serial.setDebugOutput(true);
-#endif
 
   pref.begin(NAMESPACE, false);
 
