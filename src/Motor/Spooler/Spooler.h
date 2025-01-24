@@ -24,6 +24,9 @@ class Spooler {
   float setPoint, input, output;
   float Kp = 0.8, Ki = 1, Kd = 0.03;
   unsigned long spooler_loop_last_millis = 0;
+  unsigned long spooler_test_last_millis = 0;
+
+  bool testing = false;
 
   void setupPID();
   void setupDriver();
@@ -35,4 +38,5 @@ class Spooler {
 
   void setup();
   void loop(unsigned long interval = 0);
+  void test();
 };

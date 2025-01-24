@@ -44,6 +44,10 @@ static void restart_system_cb(lv_event_t *event) {
   NVIC_SystemReset();
 }
 
+static void spool_test_cb(lv_event_t *event) {
+  spooler.test();
+}
+
 void build_settingsTab(lv_obj_t *parent) {
   lv_obj_t *settingsParent = lv_obj_create(parent);
   lv_obj_align(settingsParent, LV_ALIGN_TOP_LEFT, 10, 10);
@@ -118,4 +122,13 @@ void build_settingsTab(lv_obj_t *parent) {
   lv_obj_t *restartSystemBtnLabel = lv_label_create(restartSystemBtn);
   lv_obj_set_style_text_color(restartSystemBtnLabel, lv_color_hex(0xFFFFFF), 0);
   lv_label_set_text(restartSystemBtnLabel, LV_SYMBOL_REFRESH " Reiniciar");
+
+  lv_obj_t *spoolTestBtn = lv_btn_create(settingsParent);
+  lv_obj_align(spoolTestBtn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+  lv_obj_set_style_bg_color(spoolTestBtn, lv_palette_main(LV_PALETTE_BLUE), 0);
+  lv_obj_add_event_cb(spoolTestBtn, spool_test_cb, LV_EVENT_CLICKED, NULL);
+
+  lv_obj_t *spoolTestBtnLabel = lv_label_create(spoolTestBtn);
+  lv_obj_set_style_text_color(spoolTestBtnLabel, lv_color_hex(0xFFFFFF), 0);
+  lv_label_set_text(spoolTestBtnLabel, "Spool Test");
 }

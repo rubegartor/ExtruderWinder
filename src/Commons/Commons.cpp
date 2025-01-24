@@ -11,7 +11,8 @@ EEPROM_Preferences preferences(0x50, EEPROM_24LC256);
 float diameter;
 float autostop;
 
-int32_t to_move;
+int32_t aligner_to_move;
+int16_t aligner_left_pos, aligner_right_pos;
 
 void initCommons() {
   pinMode(ALIGNER_CS_PIN, OUTPUT);
@@ -27,7 +28,7 @@ void initCommons() {
   diameter = preferences.getFloat(DIAMETER_PREF, DIAMETER_DEFAULT);
   autostop = preferences.getFloat(AUTOSTOP_PREF, AUTOSTOP_DEFAULT);
 
-  to_move = static_cast<int32_t>(STEPS_PER_CM * (diameter / 10.0f));
+  aligner_to_move = static_cast<int32_t>(STEPS_PER_CM * (diameter / 10.0f));
 }
 
 void updateDiameter(float value) {
@@ -35,7 +36,7 @@ void updateDiameter(float value) {
   preferences.writeFloat(DIAMETER_PREF, value);
 
   puller.updateSetPoint(value);
-  to_move = static_cast<int32_t>(STEPS_PER_CM / value);
+  aligner_to_move = static_cast<int32_t>(STEPS_PER_CM / value);
 }
 
 void updateAutostop(float value) {

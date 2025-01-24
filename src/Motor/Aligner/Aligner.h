@@ -48,5 +48,6 @@ class Aligner
     void resetHome();
     void setStartPosition();
     void setEndPosition();
+    bool isHoming();
     bool isPositioned();
 };

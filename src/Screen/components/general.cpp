@@ -9,7 +9,7 @@ lv_obj_t *winderInfoPullerSpeedLabel, *winderInfoTimeLabel, *winderInfoWeightLab
 lv_obj_t *activeTabIndex, *confirmationMenuAction;
 lv_obj_t *minSpeedSpinbox, *maxSpeedSpinbox, *waterTempSpinbox, *diameterSpinbox, *autostopSpinbox, *autostopSpinboxLabel;
 lv_obj_t *polymerDropdown;
-lv_obj_t *positionBar, *homePositionBtn, *startAlignerBtn;
+lv_obj_t *positionBar, *homePositionBtn, *startAlignerBtn, *positionBarMinLabel, *positionBarMaxLabel;
 
 void setActiveTab(uint8_t index) {
   lv_label_set_text(activeTabIndex, String(index).c_str());
@@ -30,9 +30,11 @@ void update_ui(lv_timer_t *timer) {
   lv_label_set_text_fmt(minMeasureLabel, "%.2f", measurement.minRead);
   lv_label_set_text_fmt(maxMeasureLabel, "%.2f", measurement.maxRead);
 
-  aligner.currentPosition();
-
-  lv_bar_set_value(positionBar, abs(0), LV_ANIM_ON);
+  if (!aligner.isHoming()) {
+    lv_bar_set_value(positionBar, aligner.currentPosition(), LV_ANIM_ON);
+    lv_label_set_text_fmt(positionBarMinLabel, "0%% (%d)", aligner_left_pos);
+    lv_label_set_text_fmt(positionBarMaxLabel, "100%% (%d)", aligner_right_pos);
+  }
 
   lv_label_set_text(winderInfoTimeLabel, getTime(millis()));
 

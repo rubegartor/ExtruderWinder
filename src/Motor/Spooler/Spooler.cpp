@@ -93,22 +93,34 @@ void Spooler::loop(unsigned long interval) {
   if (currentMillis - this->spooler_loop_last_millis >= interval) {
     this->spooler_loop_last_millis = currentMillis;
 
-    this->input = tensioner.distance;
+    if (!testing) {
+      this->input = tensioner.distance;
 
-    this->pid.Compute();
+      this->pid.Compute();
 
-    this->speed = map(this->output, MIN_PID_SPOOLER_OUTPUT_LIMIT, MAX_PID_SPOOLER_OUTPUT_LIMIT, this->maxOutput, this->minOutput);
+      this->speed = map(this->output, MIN_PID_SPOOLER_OUTPUT_LIMIT, MAX_PID_SPOOLER_OUTPUT_LIMIT, this->maxOutput, this->minOutput);
 
-    if (!aligner.isPositioned()) {
-      this->spooler.controller.writeMaxVelocity(0);
-      return;
+      if (!aligner.isPositioned()) {
+        this->spooler.controller.writeMaxVelocity(0);
+        return;
+      }
+
+      this->spooler.controller.writeMaxVelocity(this->spooler.converter.velocityRealToChip(this->speed));
+
+      if (this->spooler.controller.readActualPosition() >= SPOOLER_ONE_REV_STEPS) {
+        this->spooler.controller.zeroActualPosition();
+        this->revs++;
+      }
     }
+  }
+}
 
-    this->spooler.controller.writeMaxVelocity(this->spooler.converter.velocityRealToChip(this->speed));
-
-    if (this->spooler.controller.readActualPosition() >= SPOOLER_ONE_REV_STEPS) {
-      this->spooler.controller.zeroActualPosition();
-      this->revs++;
-    }
+void Spooler::test() {
+  if (!testing) {
+    testing = true;
+    this->spooler.controller.writeMaxVelocity(this->spooler.converter.velocityRealToChip(SPOOLER_MAX_SPEED));
+  } else {
+    testing = false;
+    this->spooler.controller.writeMaxVelocity(0);
   }
 }

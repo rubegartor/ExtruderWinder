@@ -12,7 +12,7 @@ static void move_left_cb(lv_event_t *event) {
   }
 
   if (code == LV_EVENT_SHORT_CLICKED) {
-    aligner.moveTo(-to_move);
+    aligner.moveTo(-aligner_to_move);
     aligner.canMoveLeft = false;
   }
 }
@@ -29,25 +29,29 @@ static void move_right_cb(lv_event_t *event) {
   }
 
   if (code == LV_EVENT_SHORT_CLICKED) {
-    aligner.moveTo(to_move);
+    aligner.moveTo(aligner_to_move);
     aligner.canMoveRight = false;
   }
 }
 
 static void add_right_cb(lv_event_t *event) {
-  //communication.sendEvent("addRPos", "");
+  aligner.endPos = aligner.endPos + aligner_to_move;
+  aligner_right_pos += 1;
 }
 
 static void remove_right_cb(lv_event_t *event) {
-  //communication.sendEvent("rmRPos", "");
+  aligner.endPos = aligner.endPos - aligner_to_move;
+  aligner_right_pos -= 1;
 }
 
 static void add_left_cb(lv_event_t *event) {
-  //communication.sendEvent("addLPos", "");
+  aligner.startPos = aligner.startPos + aligner_to_move;
+  aligner_left_pos += 1;
 }
 
 static void remove_left_cb(lv_event_t *event) {
-  //communication.sendEvent("rmLPos", "");
+  aligner.startPos = aligner.startPos - aligner_to_move;
+  aligner_left_pos -= 1;
 }
 
 static void home_aligner_cb(lv_event_t *event) {
@@ -122,13 +126,13 @@ void build_controlTab(lv_obj_t *parent) {
   lv_obj_add_style(positionBar, &style_positionBar, LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(positionBar, lv_palette_lighten(LV_PALETTE_GREY, 3), 0);
 
-  lv_obj_t * positionBarMinLabel = lv_label_create(controlParentTop);
-  lv_label_set_text(positionBarMinLabel, "0%");
+  positionBarMinLabel = lv_label_create(controlParentTop);
+  lv_label_set_text(positionBarMinLabel, "0% (0)");
   lv_obj_set_style_text_color(positionBarMinLabel, lv_color_hex(0xFFFFFF), 0);
   lv_obj_align(positionBarMinLabel, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
-  lv_obj_t * positionBarMaxLabel = lv_label_create(controlParentTop);
-  lv_label_set_text(positionBarMaxLabel, "100%");
+  positionBarMaxLabel = lv_label_create(controlParentTop);
+  lv_label_set_text(positionBarMaxLabel, "100% (0)");
   lv_obj_set_style_text_color(positionBarMaxLabel, lv_color_hex(0xFFFFFF), 0);
   lv_obj_align(positionBarMaxLabel, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
 

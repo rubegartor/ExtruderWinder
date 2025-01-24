@@ -124,13 +124,13 @@ void Aligner::setup() {
 
 int32_t Aligner::nextMovePosition() {
   int32_t current_position_chip = this->aligner.controller.readActualPosition();
-  int32_t steps_to_go = to_move * 2;
+  int32_t steps_to_go = aligner_to_move * 1.25;
 
   if (current_position_chip >= this->endPos) {
     this->motorDirection = BACKWARD;
   }
 
-  if (current_position_chip <= 0) {
+  if (current_position_chip <= this->startPos) {
     this->motorDirection = FORWARD;
   }
 
@@ -151,6 +151,9 @@ void Aligner::loop() {
     case WAITING_FOR_HOME:
       if (aligner.homed()) {
         aligner.endHome();
+        aligner_left_pos = 0;
+        aligner_right_pos = 0;
+
         currentState = MOVING_TO_TARGET;
       }
       break;
@@ -177,16 +180,17 @@ void Aligner::loop() {
       }
       break;
     case IDLE:
-      if (millis() - aligner_manual_movement_last_millis >= 50) {
-        if (this->canMoveRight) {
-          this->moveTo(to_move);
-        } else if (this->canMoveLeft) {
-          this->moveTo(-to_move);
-        }
-
-        aligner_manual_movement_last_millis = millis();
-      }
       break;
+  }
+
+  if (millis() - aligner_manual_movement_last_millis >= 25) {
+    if (this->canMoveRight) {
+      this->moveTo(aligner_to_move);
+    } else if (this->canMoveLeft) {
+      this->moveTo(-aligner_to_move);
+    }
+
+    aligner_manual_movement_last_millis = millis();
   }
 }
 
@@ -201,8 +205,8 @@ void Aligner::moveTo(int32_t position) {
   int32_t current_position = this->aligner.controller.readTargetPosition();
   int32_t to_go = current_position + position;
 
-  if (to_go <= 0) {
-    this->aligner.controller.writeTargetPosition(0);
+  if (to_go <= this->startPos) {
+    this->aligner.controller.writeTargetPosition(this->startPos);
   } else if (to_go >= this->endPos) {
     this->aligner.controller.writeTargetPosition(this->endPos);
   } else {
@@ -217,6 +221,9 @@ void Aligner::stop(int32_t correction) {
 }
 
 void Aligner::resetHome() {
+  this->startPos = 0;
+  this->endPos = MAX_ALIGNER_POSITION;
+
   aligner.controller.setup(aligner.converter.controllerParametersRealToChip(controller_parameters_real));
   this->currentState = HOMING;
 }
@@ -231,6 +238,10 @@ void Aligner::setEndPosition() {
   this->aligner.controller.writeTargetPosition(0);
 
   this->currentState = AUTO_MOVE;
+}
+
+bool Aligner::isHoming() {
+  return this->currentState == HOMING || this->currentState == WAITING_FOR_HOME;
 }
 
 bool Aligner::isPositioned() {

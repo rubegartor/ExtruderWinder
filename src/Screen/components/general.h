@@ -24,7 +24,7 @@ extern lv_obj_t *minMeasureLabel, *actMeasureLabel, *maxMeasureLabel;
 extern lv_obj_t *winderInfoPullerSpeedLabel, *winderInfoTimeLabel, *winderInfoWeightLabel, *waterTempInfoLabel;
 extern lv_obj_t *activeTabIndex, *confirmationMenuAction;
 extern lv_obj_t *minSpeedSpinbox, *maxSpeedSpinbox, *diameterSpinbox, *autostopSpinbox, *autostopSpinboxLabel;
-extern lv_obj_t *positionBar, *homePositionBtn, *startAlignerBtn;
+extern lv_obj_t *positionBar, *homePositionBtn, *startAlignerBtn, *positionBarMinLabel, *positionBarMaxLabel;
 
 void setActiveTab(uint8_t index);
 

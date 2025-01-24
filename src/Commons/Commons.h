@@ -28,7 +28,8 @@ extern EEPROM_Preferences preferences;
 extern float diameter;
 extern float autostop;
 
-extern int32_t to_move;
+extern int32_t aligner_to_move;
+extern int16_t aligner_left_pos, aligner_right_pos;
 
 void initCommons();
 
