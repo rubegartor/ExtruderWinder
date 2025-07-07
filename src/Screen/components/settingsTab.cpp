@@ -40,12 +40,20 @@ static void lv_max_spinbox_increment_event_cb(lv_event_t *event)
   }
 }
 
-static void restart_system_cb(lv_event_t *event) {
-  NVIC_SystemReset();
+static void plastic_type_changed_event_cb(lv_event_t *event) {
+  lv_obj_t *dropdown = (lv_obj_t *)lv_event_get_target(event);
+  uint8_t selected = lv_dropdown_get_selected(dropdown);
+
+  if (selected < plasticTypes.size()) {
+    updatePlasticType(selected);
+
+    lv_label_set_text_fmt(winderInfoWeightLabelType, "%s", plasticTypes[selected].name.c_str());
+    lv_obj_align_to(winderInfoWeightLabelType, winderInfoWeightLabelIcon, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+  }
 }
 
-static void spool_test_cb(lv_event_t *event) {
-  spooler.test();
+static void restart_system_cb(lv_event_t *event) {
+  NVIC_SystemReset();
 }
 
 void build_settingsTab(lv_obj_t *parent) {
@@ -114,6 +122,23 @@ void build_settingsTab(lv_obj_t *parent) {
   lv_obj_set_style_bg_color(maxSpeedSpinboxMinusBtn, lv_palette_main(LV_PALETTE_ORANGE), 0);
   lv_obj_add_event_cb(maxSpeedSpinboxMinusBtn, lv_max_spinbox_decrement_event_cb, LV_EVENT_ALL, NULL);
 
+  lv_obj_t *plasticTypeLabel = lv_label_create(settingsParent);
+  lv_obj_set_style_text_color(plasticTypeLabel, lv_color_hex(0xFFFFFF), 0);
+  lv_label_set_text(plasticTypeLabel, "Tipo de plastico");
+  lv_obj_align(plasticTypeLabel, LV_ALIGN_TOP_LEFT, 0, 180);
+
+  lv_obj_t *plasticTypeDropdown = lv_dropdown_create(settingsParent);
+  std::string options;
+  for (size_t i = 0; i < plasticTypes.size(); ++i) {
+    options += plasticTypes[i].name.c_str();
+    if (i != plasticTypes.size() - 1) options += "\n";
+  }
+  lv_dropdown_set_options(plasticTypeDropdown, options.c_str());
+  lv_obj_set_width(plasticTypeDropdown, 280);
+  lv_obj_align_to(plasticTypeDropdown, maxSpeedSpinboxMinusBtn, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 20);
+  lv_dropdown_set_selected(plasticTypeDropdown, selectedPlasticTypeIndex);
+  lv_obj_add_event_cb(plasticTypeDropdown, plastic_type_changed_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+
   lv_obj_t *restartSystemBtn = lv_btn_create(settingsParent);
   lv_obj_align(restartSystemBtn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
   lv_obj_set_style_bg_color(restartSystemBtn, lv_palette_main(LV_PALETTE_BLUE), 0);
@@ -122,13 +147,4 @@ void build_settingsTab(lv_obj_t *parent) {
   lv_obj_t *restartSystemBtnLabel = lv_label_create(restartSystemBtn);
   lv_obj_set_style_text_color(restartSystemBtnLabel, lv_color_hex(0xFFFFFF), 0);
   lv_label_set_text(restartSystemBtnLabel, LV_SYMBOL_REFRESH " Reiniciar");
-
-  lv_obj_t *spoolTestBtn = lv_btn_create(settingsParent);
-  lv_obj_align(spoolTestBtn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-  lv_obj_set_style_bg_color(spoolTestBtn, lv_palette_main(LV_PALETTE_BLUE), 0);
-  lv_obj_add_event_cb(spoolTestBtn, spool_test_cb, LV_EVENT_CLICKED, NULL);
-
-  lv_obj_t *spoolTestBtnLabel = lv_label_create(spoolTestBtn);
-  lv_obj_set_style_text_color(spoolTestBtnLabel, lv_color_hex(0xFFFFFF), 0);
-  lv_label_set_text(spoolTestBtnLabel, "Spool Test");
 }

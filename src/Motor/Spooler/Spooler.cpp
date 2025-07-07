@@ -3,60 +3,55 @@
 
 const tmc51x0::SpiParameters spi_parameters =
 {
-  SPI1,
-  1000000, // clock_rate
-  SPOOLER_CS_PIN // chip_select_pin
+  .spi_ptr = &SPI1,
+  .clock_rate = 1000000,
+  .chip_select_pin = SPOOLER_CS_PIN
 };
 
 const tmc51x0::ConverterParameters converter_parameters =
 {
-  TMC5160_CLK, // clock_frequency_mhz
-  800, // microsteps_per_real_unit
+  .clock_frequency_mhz = TMC5160_CLK_FREQ,
+  .microsteps_per_real_position_unit = 800,
 };
-// external clock is 16MHz
-// 200 fullsteps per revolution for many steppers * 256 microsteps per fullstep
-// one "real unit" in this example is one rotation of the motor shaft
-// rotations/s -> rotations/min
-// rotations/(s^2) -> (rotations/min)/s
 
 const tmc51x0::DriverParameters driver_parameters_real =
 {
-  100, // global_current_scaler (percent)
-  35, // run_current (percent)
-  45, // hold_current (percent)
-  0, // hold_delay (percent)
-  15, // pwm_offset (percent)
-  5, // pwm_gradient (percent)
-  false, // automatic_current_control_enabled
-  tmc51x0::FORWARD, // motor_direction
-  tmc51x0::NORMAL, // standstill_mode
-  tmc51x0::SPREAD_CYCLE, // chopper_mode
-  1, // stealth_chop_threshold (rotations/min)
-  true, // stealth_chop_enabled
-  1, // cool_step_threshold (rotations/min)
-  1, // cool_step_min
-  0, // cool_step_max
-  true, // cool_step_enabled
-  20000, // high_velocity_threshold (rotations/min)
-  false, // high_velocity_fullstep_enabled
-  false, // high_velocity_chopper_switch_enabled
-  0, // stall_guard_threshold
-  true, // stall_guard_filter_enabled
-  true // short_to_ground_protection_enabled
+  .global_current_scaler = 100,
+  .run_current = 45,
+  .hold_current = 45,
+  .hold_delay = 0,
+  .pwm_offset = 15,
+  .pwm_gradient = 5,
+  .automatic_current_control_enabled = false,
+  .motor_direction = tmc51x0::ForwardDirection,
+  .standstill_mode = tmc51x0::NormalMode,
+  .chopper_mode = tmc51x0::SpreadCycleMode,
+  .stealth_chop_threshold = 1,
+  .stealth_chop_enabled = true,
+  .cool_step_threshold = 1,
+  .cool_step_min = 1,
+  .cool_step_max = 0,
+  .cool_step_enabled = true,
+  .high_velocity_threshold = 20000,
+  .high_velocity_fullstep_enabled = false,
+  .high_velocity_chopper_switch_enabled = false,
+  .stall_guard_threshold = 0,
+  .stall_guard_filter_enabled = false,
+  .short_to_ground_protection_enabled = true
 };
 
 const tmc51x0::ControllerParameters controller_parameters_real =
 {
-  tmc51x0::VELOCITY_POSITIVE, // ramp_mode
-  tmc51x0::SOFT, // stop_mode
-  0, // max_velocity (rotations/min)
-  SPOOLER_MAX_SPEED * 2, // max_acceleration ((rotations/min)/s)
+  .ramp_mode = tmc51x0::VelocityPositiveMode,
+  .stop_mode = tmc51x0::SoftMode,
+  .max_velocity = 0,
+  .max_acceleration = SPOOLER_MAX_SPEED * 2,
 };
 
 void Spooler::setupPID() {
   this->pid = QuickPID(&input, &output, &setPoint, Kp, Ki, Kd, QuickPID::Action::direct);
 
-  this->setPoint = SETPOINT_PID_SPOOLER;
+  this->setPoint = TENSIONER_SETPOINT;
   this->minOutput = 0;
   this->maxOutput = SPOOLER_MAX_SPEED;
 
@@ -93,34 +88,55 @@ void Spooler::loop(unsigned long interval) {
   if (currentMillis - this->spooler_loop_last_millis >= interval) {
     this->spooler_loop_last_millis = currentMillis;
 
-    if (!testing) {
-      this->input = tensioner.distance;
+    this->input = tensioner.distance;
 
-      this->pid.Compute();
+    this->pid.Compute();
 
-      this->speed = map(this->output, MIN_PID_SPOOLER_OUTPUT_LIMIT, MAX_PID_SPOOLER_OUTPUT_LIMIT, this->maxOutput, this->minOutput);
+    this->speed = map(this->output, MIN_PID_SPOOLER_OUTPUT_LIMIT, MAX_PID_SPOOLER_OUTPUT_LIMIT, this->maxOutput, this->minOutput);
 
-      if (!aligner.isPositioned()) {
-        this->spooler.controller.writeMaxVelocity(0);
-        return;
-      }
+    if (!aligner.isPositioned()) {
+      this->spooler.controller.writeMaxVelocity(0);
+      return;
+    }
 
-      this->spooler.controller.writeMaxVelocity(this->spooler.converter.velocityRealToChip(this->speed));
+    this->spooler.controller.writeMaxVelocity(this->spooler.converter.velocityRealToChip(this->speed));
 
-      if (this->spooler.controller.readActualPosition() >= SPOOLER_ONE_REV_STEPS) {
-        this->spooler.controller.zeroActualPosition();
-        this->revs++;
-      }
+    if (this->spooler.controller.readActualPosition() >= SPOOLER_ONE_REV_STEPS) {
+      this->spooler.controller.zeroActualPosition();
+      this->revs++;
     }
   }
 }
 
-void Spooler::test() {
-  if (!testing) {
-    testing = true;
-    this->spooler.controller.writeMaxVelocity(this->spooler.converter.velocityRealToChip(SPOOLER_MAX_SPEED));
-  } else {
-    testing = false;
-    this->spooler.controller.writeMaxVelocity(0);
-  }
+bool Spooler::enabled() {
+  using namespace tmc51x0;
+
+  tmc51x0::Registers::Chopconf chopConf;
+  chopConf.bytes = this->spooler.registers.read(Registers::ChopconfAddress);
+
+  return chopConf.toff != 0;
+}
+
+bool Spooler::drvErr() {
+  using namespace tmc51x0;
+
+  tmc51x0::Registers::Gstat gstat;
+  gstat.bytes = this->spooler.registers.read(Registers::GstatAddress);
+
+  return gstat.drv_err;
+}
+
+uint32_t Spooler::drvStatusBytes() {
+  using namespace tmc51x0;
+
+  tmc51x0::Registers::DrvStatus drv_status;
+  drv_status.bytes = this->spooler.registers.read(Registers::DrvStatusAddress);
+
+  return drv_status.bytes;
+}
+
+void Spooler::reinit() {
+  digitalWrite(SPOOLER_CS_PIN, HIGH);
+
+  this->spooler.reinitialize();
 }

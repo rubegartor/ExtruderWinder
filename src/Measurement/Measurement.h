@@ -2,17 +2,20 @@
 
 #include <Arduino.h>
 
-#define CLOCK_PIN 5
-#define DATA_PIN 4
+#define MEASUREMENT_REQ_PIN 24
+#define MEASUREMENT_CLK_PIN 23
+#define MEASUREMENT_DATA_PIN 22
 
-#define MEASUREMENT_BITS 24
-#define DATA_OUTPUT_RATE_MS 80
+#define MITUTOYO_CLK_DEBOUNCE 220
+
+#define ERROR_DETECTION_ENABLE_THRESHOLD 0.15f
+#define ERROR_DETECTION_THRESHOLD 1.00f
+
+#define MEASUREMENT_LIMIT 10.60f
 
 class Measurement {
-  private:
-    unsigned long measurement_decode_last_millis = 0;
-
-    void decode();
+  // private:
+  //   bool errorDetectionEnabled = false;
   public:
     float lastRead = 0.00f;
     float minRead = 0.00f;
@@ -20,6 +23,5 @@ class Measurement {
 
     void setup();
     void loop();
-
     void reset();
 };

@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include <Screen/components/sidebar.h>
 #include <Screen/components/homeTab.h>
 #include <Screen/components/popupTab.h>

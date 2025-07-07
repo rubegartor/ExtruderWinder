@@ -10,7 +10,6 @@ void Tensioner::loop(unsigned long interval) {
 
   if (currentMillis - this->tensioner_loop_last_millis >= interval) {
     this->tensioner_loop_last_millis = currentMillis;
-    
-    this->distance = sonar.ping_cm() * 10;
+    this->distance = sonar.ping_cm(TENSIONER_MAX_DISTANCE) * 10;
   }
 }

@@ -20,6 +20,7 @@ void setup()
   puller.setup();
   spooler.setup();
   tensioner.setup();
+  rf.setup();
 
   Display.begin();
   TouchDetector.begin();
@@ -33,17 +34,15 @@ void setup()
   setupUITimer();
 }
 
-unsigned long lvglMillis = 0;
-
 void loop() {
-  if (millis() - lvglMillis >= 5) {
-    lv_task_handler();
-    lvglMillis = millis();
-  }
+  lv_timer_handler_run_in_period(5);
 
+  measurement.loop();
   aligner.loop();
   puller.loop();
   spooler.loop();
   tensioner.loop(250);
-  measurement.loop();
+  rf.loop(250);
+
+  motorWatchdog();
 }

@@ -37,72 +37,37 @@ static void move_right_cb(lv_event_t *event) {
 static void add_right_cb(lv_event_t *event) {
   aligner.endPos = aligner.endPos + aligner_to_move;
   aligner_right_pos += 1;
+
+  lv_bar_set_range(positionBar, lv_bar_get_min_value(positionBar), aligner.endPos);
 }
 
 static void remove_right_cb(lv_event_t *event) {
   aligner.endPos = aligner.endPos - aligner_to_move;
   aligner_right_pos -= 1;
+
+  lv_bar_set_range(positionBar, lv_bar_get_min_value(positionBar), aligner.endPos);
 }
 
 static void add_left_cb(lv_event_t *event) {
   aligner.startPos = aligner.startPos + aligner_to_move;
   aligner_left_pos += 1;
+
+  lv_bar_set_range(positionBar, aligner.startPos, lv_bar_get_max_value(positionBar));
 }
 
 static void remove_left_cb(lv_event_t *event) {
   aligner.startPos = aligner.startPos - aligner_to_move;
   aligner_left_pos -= 1;
+
+  lv_bar_set_range(positionBar, aligner.startPos, lv_bar_get_max_value(positionBar));
 }
 
 static void home_aligner_cb(lv_event_t *event) {
   aligner.resetHome();
 }
 
-static void set_aligner_end_position(lv_event_t *event) {
-  aligner.setEndPosition();
-
-  lv_obj_t * target = (lv_obj_t *)lv_event_get_target(event);
-
-  lv_bar_set_range(positionBar, 0, aligner.endPos);
-
-  lv_obj_t *tempParent = lv_obj_get_parent(target);
-
-  lv_obj_del(target);
-
-  lv_obj_set_style_pad_top(tempParent, 80, 0);
-}
-
-static void set_aligner_start_position(lv_event_t *event) {
-  aligner.setStartPosition();
-
-  lv_obj_t * target = (lv_obj_t *)lv_event_get_target(event);
-
-  lv_obj_t *alignerSetEndPositionBtn = lv_btn_create(lv_obj_get_parent(target));
-  lv_obj_set_size(alignerSetEndPositionBtn, LV_SIZE_CONTENT, 80);
-  lv_obj_align(alignerSetEndPositionBtn, LV_ALIGN_CENTER, 0, 80);
-  lv_obj_add_event_cb(alignerSetEndPositionBtn, set_aligner_end_position, LV_EVENT_CLICKED, NULL);
-
-  lv_obj_t *alignerSetEndPositionBtnLabel = lv_label_create(alignerSetEndPositionBtn);
-  lv_obj_align(alignerSetEndPositionBtnLabel, LV_ALIGN_CENTER, 0, 0);
-  lv_label_set_text(alignerSetEndPositionBtnLabel, "Establecer fin");
-  lv_obj_set_style_text_color(alignerSetEndPositionBtnLabel, lv_color_hex(0xFFFFFF), 0);
-
-  lv_obj_del(target);
-}
-
 static void start_aligner(lv_event_t *event) {
-  lv_obj_t * target = (lv_obj_t *)lv_event_get_target(event);
-  lv_obj_add_flag(target, LV_OBJ_FLAG_HIDDEN);
-
-  lv_obj_t *alignerSetStartPositionBtn = lv_btn_create(lv_obj_get_parent(target));
-  lv_obj_set_size(alignerSetStartPositionBtn, LV_SIZE_CONTENT, 80);
-  lv_obj_align(alignerSetStartPositionBtn, LV_ALIGN_CENTER, 0, 80);
-  lv_obj_add_event_cb(alignerSetStartPositionBtn, set_aligner_start_position, LV_EVENT_CLICKED, NULL);
-
-  lv_obj_t *alignerSetStartPositionBtnLabel = lv_label_create(alignerSetStartPositionBtn);
-  lv_obj_align(alignerSetStartPositionBtnLabel, LV_ALIGN_CENTER, 0, 0);
-  lv_label_set_text(alignerSetStartPositionBtnLabel, "Establecer inicio");
-  lv_obj_set_style_text_color(alignerSetStartPositionBtnLabel, lv_color_hex(0xFFFFFF), 0);
+  aligner.startSpoolCalibration();
 }
 
 void build_controlTab(lv_obj_t *parent) {
@@ -136,7 +101,7 @@ void build_controlTab(lv_obj_t *parent) {
   lv_obj_set_style_text_color(positionBarMaxLabel, lv_color_hex(0xFFFFFF), 0);
   lv_obj_align(positionBarMaxLabel, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
 
-  lv_obj_t * controlParentContent = lv_obj_create(parent);
+  lv_obj_t *controlParentContent = lv_obj_create(parent);
   lv_obj_align_to(controlParentContent, controlParentTop, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 10);
   lv_obj_set_size(controlParentContent, lv_obj_get_width(parent) - 20, lv_obj_get_height(parent) - lv_obj_get_height(controlParentTop) - 30);
   lv_obj_set_style_bg_color(controlParentContent, lv_palette_darken(LV_PALETTE_GREY, 2), 0);
@@ -158,7 +123,9 @@ void build_controlTab(lv_obj_t *parent) {
   lv_obj_set_size(moveLeftBtn, 125, 125);
   lv_obj_align_to(moveLeftBtn, homePositionBtn, LV_ALIGN_OUT_LEFT_MID, -10, 0);
   lv_obj_set_style_bg_color(moveLeftBtn, lv_palette_main(LV_PALETTE_ORANGE), 0);
-  lv_obj_add_event_cb(moveLeftBtn, move_left_cb, LV_EVENT_ALL, NULL);
+  lv_obj_add_event_cb(moveLeftBtn, move_left_cb, LV_EVENT_SHORT_CLICKED, NULL);
+  lv_obj_add_event_cb(moveLeftBtn, move_left_cb, LV_EVENT_LONG_PRESSED, NULL);
+  lv_obj_add_event_cb(moveLeftBtn, move_left_cb, LV_EVENT_RELEASED, NULL);
 
   lv_obj_t *moveLeftBtnLabel = lv_label_create(controlParentContent);
   lv_label_set_text(moveLeftBtnLabel, LV_SYMBOL_LEFT);
@@ -196,7 +163,9 @@ void build_controlTab(lv_obj_t *parent) {
   lv_obj_set_size(moveRightBtn, 125, 125);
   lv_obj_align_to(moveRightBtn, homePositionBtn, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
   lv_obj_set_style_bg_color(moveRightBtn, lv_palette_main(LV_PALETTE_ORANGE), 0);
-  lv_obj_add_event_cb(moveRightBtn, move_right_cb, LV_EVENT_ALL, NULL);
+  lv_obj_add_event_cb(moveRightBtn, move_right_cb, LV_EVENT_SHORT_CLICKED, NULL);
+  lv_obj_add_event_cb(moveRightBtn, move_right_cb, LV_EVENT_LONG_PRESSED, NULL);
+  lv_obj_add_event_cb(moveRightBtn, move_right_cb, LV_EVENT_RELEASED, NULL);
 
   lv_obj_t *moveRightBtnLabel = lv_label_create(controlParentContent);
   lv_label_set_text(moveRightBtnLabel, LV_SYMBOL_RIGHT);
@@ -228,16 +197,18 @@ void build_controlTab(lv_obj_t *parent) {
   lv_obj_align_to(removeRightBtnLabel, removeRightBtn, LV_ALIGN_CENTER, 0, 0);
   lv_obj_set_style_text_color(removeRightBtnLabel, lv_color_hex(0xFFFFFF), 0);
 
-  startAlignerBtn = lv_btn_create(controlParentContent);
-  lv_obj_align(startAlignerBtn, LV_ALIGN_CENTER, 0, 80);
-  lv_obj_set_style_bg_color(startAlignerBtn, lv_palette_darken(LV_PALETTE_BLUE, 2), 0);
-  lv_obj_set_size(startAlignerBtn, LV_SIZE_CONTENT, 80);
-  lv_obj_set_style_shadow_width(startAlignerBtn, 0, 0);
-  lv_obj_add_event_cb(startAlignerBtn, start_aligner, LV_EVENT_CLICKED, NULL);
+  startSpoolCalibrationBtn = lv_btn_create(controlParentContent);
+  lv_obj_align(startSpoolCalibrationBtn, LV_ALIGN_CENTER, 0, 80);
+  lv_obj_set_style_bg_color(startSpoolCalibrationBtn, lv_palette_darken(LV_PALETTE_BLUE, 2), 0);
+  lv_obj_set_size(startSpoolCalibrationBtn, LV_SIZE_CONTENT, 80);
+  lv_obj_set_style_shadow_width(startSpoolCalibrationBtn, 0, 0);
+  lv_obj_set_style_pad_left(startSpoolCalibrationBtn, 20, 0);
+  lv_obj_set_style_pad_right(startSpoolCalibrationBtn, 20, 0);
+  lv_obj_add_event_cb(startSpoolCalibrationBtn, start_aligner, LV_EVENT_CLICKED, NULL);
 
-  lv_obj_t *startAlignerBtnLabel = lv_label_create(startAlignerBtn);
-  lv_label_set_text(startAlignerBtnLabel, "Comenzar alineamiento");
-  lv_obj_set_style_text_font(startAlignerBtnLabel, &lv_font_montserrat_32, 0);
-  lv_obj_align_to(startAlignerBtnLabel, startAlignerBtn, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_text_color(startAlignerBtnLabel, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_t *startSpoolCalibrationBtnLabel = lv_label_create(startSpoolCalibrationBtn);
+  lv_label_set_text(startSpoolCalibrationBtnLabel, "Calibrar bobina");
+  lv_obj_set_style_text_font(startSpoolCalibrationBtnLabel, &lv_font_montserrat_32, 0);
+  lv_obj_align_to(startSpoolCalibrationBtnLabel, startSpoolCalibrationBtn, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_set_style_text_color(startSpoolCalibrationBtnLabel, lv_color_hex(0xFFFFFF), 0);
 }

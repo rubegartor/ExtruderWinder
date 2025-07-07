@@ -8,9 +8,7 @@
 #define MIN_PID_SPOOLER_OUTPUT_LIMIT 0
 #define MAX_PID_SPOOLER_OUTPUT_LIMIT 255
 
-#define SETPOINT_PID_SPOOLER 100
-
-#define SPOOLER_MAX_SPEED 220
+#define SPOOLER_MAX_SPEED 300
 
 #define SPOOLER_GEARBOX_RATIO 5
 #define SPOOLER_ONE_REV_STEPS (51200 * SPOOLER_GEARBOX_RATIO)
@@ -26,8 +24,6 @@ class Spooler {
   unsigned long spooler_loop_last_millis = 0;
   unsigned long spooler_test_last_millis = 0;
 
-  bool testing = false;
-
   void setupPID();
   void setupDriver();
  public:
@@ -38,5 +34,8 @@ class Spooler {
 
   void setup();
   void loop(unsigned long interval = 0);
-  void test();
+  bool enabled();
+  bool drvErr();
+  uint32_t drvStatusBytes();
+  void reinit();
 };

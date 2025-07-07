@@ -1,119 +1,183 @@
 #include "Aligner.h"
 #include "Commons/Commons.h"
+#include "Screen/components/general.h"
 
 const tmc51x0::SpiParameters spi_parameters =
 {
-  SPI1,
-  1000000, // clock_rate
-  ALIGNER_CS_PIN // chip_select_pin
+  .spi_ptr = &SPI1,
+  .clock_rate = 1000000,
+  .chip_select_pin = ALIGNER_CS_PIN
 };
 
 const tmc51x0::ConverterParameters converter_parameters =
 {
-  TMC5160_CLK, // clock_frequency_mhz
-  6400 // microsteps_per_real_unit
+  .clock_frequency_mhz = TMC5160_CLK_FREQ,
+  .microsteps_per_real_position_unit = 6400
 };
-// external clock is 16MHz
-// 200 fullsteps per revolution for many steppers * 256 microsteps per fullstep
-// 51200 microsteps per revolution / 360 degrees per revolution ~= 142 microsteps per degree
-// one "real unit" in this example is one degree of rotation
 
 const tmc51x0::DriverParameters driver_parameters_real =
 {
-  100, // global_current_scaler (percent)
-  20, // run_current (percent)
-  50, // hold_current (percent)
-  5, // hold_delay (percent)
-  15, // pwm_offset (percent)
-  5, // pwm_gradient (percent)
-  false, // automatic_current_control_enabled
-  tmc51x0::REVERSE, // motor_direction
-  tmc51x0::NORMAL, // standstill_mode
-  tmc51x0::SPREAD_CYCLE, // chopper_mode
-  1, // stealth_chop_threshold (degrees/s)
-  true, // stealth_chop_enabled
-  1, // cool_step_threshold (degrees/s)
-  1, // cool_step_min
-  0, // cool_step_max
-  false, // cool_step_enabled
-  100, // high_velocity_threshold (degrees/s)
-  false, // high_velocity_fullstep_enabled
-  false, // high_velocity_chopper_switch_enabled
-  1, // stall_guard_threshold
-  false, // stall_guard_filter_enabled
-  true, // short_to_ground_protection_enabled
-  3, // enabled_toff
-  tmc51x0::CLOCK_CYCLES_36, // comparator_blank_time
-  37, // dc_time
-  3 // dc_stall_guard_threshold
+  .global_current_scaler = 100,
+  .run_current = 20,
+  .hold_current = 50,
+  .hold_delay = 5,
+  .pwm_offset = 15,
+  .pwm_gradient = 5,
+  .automatic_current_control_enabled = false,
+  .motor_direction = tmc51x0::ReverseDirection,
+  .standstill_mode = tmc51x0::NormalMode,
+  .chopper_mode = tmc51x0::SpreadCycleMode,
+  .stealth_chop_threshold = 1,
+  .stealth_chop_enabled = true,
+  .cool_step_threshold = 1,
+  .cool_step_min = 1,
+  .cool_step_max = 0,
+  .cool_step_enabled = false,
+  .high_velocity_threshold = 100,
+  .high_velocity_fullstep_enabled = false,
+  .high_velocity_chopper_switch_enabled = false,
+  .stall_guard_threshold = 1,
+  .stall_guard_filter_enabled = false,
+  .short_to_ground_protection_enabled = true,
+  .enabled_toff = 3,
+  .comparator_blank_time = tmc51x0::ClockCycles36,
+  .dc_time = 37,
+  .dc_stall_guard_threshold = 3
+};
+
+const tmc51x0::DriverParameters driver_parameters_real_spool =
+{
+  .global_current_scaler = 50,
+  .run_current = 4,
+  .hold_current = 8,
+  .hold_delay = 5,
+  .pwm_offset = 15,
+  .pwm_gradient = 5,
+  .automatic_current_control_enabled = false,
+  .motor_direction = tmc51x0::ReverseDirection,
+  .standstill_mode = tmc51x0::NormalMode,
+  .chopper_mode = tmc51x0::SpreadCycleMode,
+  .stealth_chop_threshold = 1,
+  .stealth_chop_enabled = true,
+  .cool_step_threshold = 1,
+  .cool_step_min = 1,
+  .cool_step_max = 0,
+  .cool_step_enabled = false,
+  .high_velocity_threshold = 100,
+  .high_velocity_fullstep_enabled = false,
+  .high_velocity_chopper_switch_enabled = false,
+  .stall_guard_threshold = 3,
+  .stall_guard_filter_enabled = true,
+  .short_to_ground_protection_enabled = true,
+  .enabled_toff = 3,
+  .comparator_blank_time = tmc51x0::ClockCycles36,
+  .dc_time = 0,
+  .dc_stall_guard_threshold = 3
 };
 
 const tmc51x0::ControllerParameters controller_parameters_real =
 {
-  tmc51x0::POSITION, // ramp_mode
-  tmc51x0::HARD, // stop_mode
-  80, // max_velocity (degrees/s)
-  300, // max_acceleration ((degrees/s)/s)
-  180, // start_velocity (degrees/s)
-  180, // stop_velocity (degrees/s)
-  180, // first_velocity (degrees/s)
-  300, // first_acceleration ((degrees/s)/s)
-  500, // max_deceleration ((degrees/s)/s)
-  500, // first_deceleration ((degrees/s)/s)
-  0, // zero_wait_duration (milliseconds)
-  false // stall_stop_enabled
+  .ramp_mode = tmc51x0::PositionMode,
+  .stop_mode = tmc51x0::HardMode,
+  .max_velocity = 80,
+  .max_acceleration = 300,
+  .start_velocity = 180,
+  .stop_velocity = 180,
+  .first_velocity = 180,
+  .first_acceleration = 300,
+  .max_deceleration = 500,
+  .first_deceleration = 500,
+  .zero_wait_duration = 0,
+  .stall_stop_enabled = false
 };
 
 const tmc51x0::ControllerParameters controller_parameters_real_position =
 {
-  tmc51x0::POSITION, // ramp_mode
-  tmc51x0::HARD, // stop_mode
-  3000, // max_velocity (degrees/s)
-  20000000, // max_acceleration ((degrees/s)/s)
-  3000, // start_velocity (degrees/s)
-  3000, // stop_velocity (degrees/s)
-  3000, // first_velocity (degrees/s)
-  20000000, // first_acceleration ((degrees/s)/s)
-  20000000, // max_deceleration ((degrees/s)/s)
-  20000000, // first_deceleration ((degrees/s)/s)
-  0, // zero_wait_duration (milliseconds)
-  false // stall_stop_enabled
+  .ramp_mode = tmc51x0::PositionMode,
+  .stop_mode = tmc51x0::HardMode,
+  .max_velocity = 3000,
+  .max_acceleration = 20000000,
+  .start_velocity = 3000,
+  .stop_velocity = 3000,
+  .first_velocity = 3000,
+  .first_acceleration = 20000000,
+  .max_deceleration = 20000000,
+  .first_deceleration = 20000000,
+  .zero_wait_duration = 0,
+  .stall_stop_enabled = false
+};
+
+const tmc51x0::ControllerParameters controller_parameters_real_spool =
+{
+  .ramp_mode = tmc51x0::PositionMode,
+  .stop_mode = tmc51x0::HardMode,
+  .max_velocity = 8,
+  .max_acceleration = 8,
+  .start_velocity = 8,
+  .stop_velocity = 8,
+  .first_velocity = 8,
+  .first_acceleration = 8,
+  .max_deceleration = 8,
+  .first_deceleration = 8,
+  .zero_wait_duration = 0,
+  .stall_stop_enabled = true
 };
 
 const tmc51x0::HomeParameters home_parameters_real =
 {
-  12, // run_current (percent)
-  20, // hold_current (percent)
-  360, // target_position (degrees)
-  40, // velocity (degrees/s)
-  400, // acceleration ((degrees/s)/s)
-  100 // zero_wait_duration (milliseconds)
+  .run_current = 12,
+  .hold_current = 20,
+  .target_position = 360,
+  .velocity = 40,
+  .acceleration = 400,
+  .zero_wait_duration = 0
 };
 
-const tmc51x0::StallParameters stall_parameters_cool_step_real =
+const tmc51x0::StallParameters stall_parameters_real =
 {
-  tmc51x0::DC_STEP, // stall_mode
-  8, // stall_guard_threshold
-  2 // cool_step_threshold (degrees/s)
+  .stall_guard_threshold = 2,
+  .cool_step_threshold = 2
 };
 
+tmc51x0::DriverParameters driver_parameters_chip;
 tmc51x0::ControllerParameters controller_parameters_chip;
-tmc51x0::HomeParameters home_parameters_chip;
-tmc51x0::StallParameters stall_parameters_cool_step_chip;
+tmc51x0::DriverParameters driver_parameters_spool_chip;
+tmc51x0::ControllerParameters controller_parameters_spool_chip;
+
+void Aligner::setupHomeParameters() {
+  tmc51x0::HomeParameters home_parameters_chip = aligner.converter.homeParametersRealToChip(home_parameters_real);
+  tmc51x0::StallParameters stall_parameters_chip = aligner.converter.stallParametersRealToChip(stall_parameters_real);
+
+  this->setupNormalParameters();
+  aligner.beginHomeToStall(home_parameters_chip, stall_parameters_chip);
+}
+
+void Aligner::setupNormalParameters() {
+  aligner.driver.setup(driver_parameters_chip);
+  aligner.controller.setup(controller_parameters_chip);
+}
+
+void Aligner::setupPositionParameters() {
+  aligner.driver.setup(driver_parameters_chip);
+  aligner.controller.setup(controller_parameters_chip);
+}
+
+void Aligner::setupHomingSpoolParameters() {
+  aligner.driver.setup(driver_parameters_spool_chip);
+  aligner.controller.setup(controller_parameters_spool_chip);
+}
 
 void Aligner::setup() {
   aligner.setupSpi(spi_parameters);
-
   aligner.converter.setup(converter_parameters);
 
-  tmc51x0::DriverParameters driver_parameters_chip = aligner.converter.driverParametersRealToChip(driver_parameters_real);
-  aligner.driver.setup(driver_parameters_chip);
-
+  driver_parameters_chip = aligner.converter.driverParametersRealToChip(driver_parameters_real);
   controller_parameters_chip = aligner.converter.controllerParametersRealToChip(controller_parameters_real);
-  aligner.controller.setup(controller_parameters_chip);
 
-  home_parameters_chip = aligner.converter.homeParametersRealToChip(home_parameters_real);
-  stall_parameters_cool_step_chip = aligner.converter.stallParametersRealToChip(stall_parameters_cool_step_real);
+  driver_parameters_spool_chip = aligner.converter.driverParametersRealToChip(driver_parameters_real_spool);
+  controller_parameters_spool_chip = aligner.converter.controllerParametersRealToChip(controller_parameters_real_spool);
+
+  setupHomeParameters();
 
   aligner.driver.enable();
 
@@ -127,14 +191,14 @@ int32_t Aligner::nextMovePosition() {
   int32_t steps_to_go = aligner_to_move * 1.25;
 
   if (current_position_chip >= this->endPos) {
-    this->motorDirection = BACKWARD;
+    this->motorDirection = MotorDirection::BACKWARD;
   }
 
   if (current_position_chip <= this->startPos) {
-    this->motorDirection = FORWARD;
+    this->motorDirection = MotorDirection::FORWARD;
   }
 
-  if (this->motorDirection == BACKWARD) {
+  if (this->motorDirection == MotorDirection::BACKWARD) {
     steps_to_go = -(steps_to_go);
   }
 
@@ -144,7 +208,7 @@ int32_t Aligner::nextMovePosition() {
 void Aligner::loop() {
   switch (currentState) {
     case HOMING:
-      aligner.beginHomeToStall(home_parameters_chip, stall_parameters_cool_step_chip);
+      this->setupHomeParameters();
       currentState = WAITING_FOR_HOME;
       break;
 
@@ -153,32 +217,67 @@ void Aligner::loop() {
         aligner.endHome();
         aligner_left_pos = 0;
         aligner_right_pos = 0;
+      
+        this->currentState = MOVING_TO_TARGET;
+      }
+      break;
 
-        currentState = MOVING_TO_TARGET;
+    case SPOOL_CALIBRATION:
+      aligner.controller.enableStallStop();
+
+      if (!this->startPosSpoolHomed) {
+        aligner.controller.writeTargetPosition(-MAX_ALIGNER_POSITION);
+      } else {
+        aligner.controller.writeTargetPosition(MAX_ALIGNER_POSITION);
+      }
+
+      if (aligner.driver.stalled()) {
+        if (!this->startPosSpoolHomed) {
+          this->startPosSpoolHomed = true;
+
+          aligner.controller.writeActualPosition(0);
+          aligner.controller.writeTargetPosition(0);
+          this->startPos = aligner_to_move;
+        } else {       
+          this->endPos = aligner.controller.readActualPosition() - aligner_to_move;
+          aligner.controller.writeTargetPosition(this->startPos);
+          this->setupNormalParameters();
+          this->currentState = AUTO_MOVE;
+
+          updateSpoolProgressLimits(this->startPos, this->endPos);
+          break;
+        }
+
+        waitAfterStallMillis = millis();
+        aligner.controller.disableStallStop();
+        this->currentState = WAIT_AFTER_STALL;
+      }
+      break;
+
+    case WAIT_AFTER_STALL:
+      if (millis() - waitAfterStallMillis >= ALIGNER_STALL_WAIT) {
+        this->currentState = SPOOL_CALIBRATION;
       }
       break;
 
     case MOVING_TO_TARGET:
-      aligner.controller.writeTargetPosition(-MAX_ALIGNER_POSITION);
+      aligner.controller.writeTargetPosition(-(MAX_ALIGNER_POSITION));
 
       if (aligner.controller.positionReached()) {
         aligner.controller.writeActualPosition(0);
         aligner.controller.writeTargetPosition(0);
 
-        aligner.controller.setup(aligner.converter.controllerParametersRealToChip(controller_parameters_real_position));
         currentState = IDLE;
       }
       break;
-    case AUTO_MOVE:
-      if (!this->startPositionReached && this->aligner.controller.positionReached()) {
-        this->startPositionReached = true;
-      }
 
-      if (this->startPositionReached && this->lastRevs != spooler.revs) {
+    case AUTO_MOVE:
+      if (this->lastRevs != spooler.revs) {
         this->moveTo(nextMovePosition());
         this->lastRevs = spooler.revs;
       }
       break;
+
     case IDLE:
       break;
   }
@@ -198,10 +297,7 @@ int32_t Aligner::currentPosition() {
   return this->aligner.controller.readActualPosition();
 }
 
-uint32_t last_moveto_millis = 0;
-
 void Aligner::moveTo(int32_t position) {
-  unsigned long current_millis = millis();
   int32_t current_position = this->aligner.controller.readTargetPosition();
   int32_t to_go = current_position + position;
 
@@ -212,32 +308,27 @@ void Aligner::moveTo(int32_t position) {
   } else {
     this->aligner.controller.writeTargetPosition(to_go);
   }
-
-  last_moveto_millis = current_millis;
-}
-
-void Aligner::stop(int32_t correction) {
-  this->aligner.controller.writeTargetPosition(this->aligner.controller.readActualPosition() - this->aligner.converter.positionRealToChip(correction));
 }
 
 void Aligner::resetHome() {
+  setupHomeParameters();
+
   this->startPos = 0;
   this->endPos = MAX_ALIGNER_POSITION;
 
-  aligner.controller.setup(aligner.converter.controllerParametersRealToChip(controller_parameters_real));
+  updateSpoolProgressLimits(this->startPos, this->endPos);
+
+  this->startPosSpoolHomed = false;
+  this->calibratedSpool = false;
   this->currentState = HOMING;
 }
 
-void Aligner::setStartPosition() {
-  this->aligner.controller.writeActualPosition(0);
-  this->aligner.controller.writeTargetPosition(0);
-}
+void Aligner::startSpoolCalibration() {  
+  setupHomingSpoolParameters();
 
-void Aligner::setEndPosition() {
-  this->endPos = this->aligner.controller.readActualPosition();
-  this->aligner.controller.writeTargetPosition(0);
-
-  this->currentState = AUTO_MOVE;
+  this->waitAfterStallMillis = 0;
+  this->startPosSpoolHomed = false;
+  this->currentState = SPOOL_CALIBRATION;
 }
 
 bool Aligner::isHoming() {
@@ -245,5 +336,38 @@ bool Aligner::isHoming() {
 }
 
 bool Aligner::isPositioned() {
-  return this->startPositionReached && this->currentState == AUTO_MOVE;
+  return this->currentState == AUTO_MOVE;
+}
+
+bool Aligner::enabled() {
+  using namespace tmc51x0;
+
+  tmc51x0::Registers::Chopconf chopConf;
+  chopConf.bytes = this->aligner.registers.read(Registers::ChopconfAddress);
+
+  return chopConf.toff != 0;
+}
+
+bool Aligner::drvErr() {
+  using namespace tmc51x0;
+
+  tmc51x0::Registers::Gstat gstat;
+  gstat.bytes = this->aligner.registers.read(Registers::GstatAddress);
+
+  return gstat.drv_err;
+}
+
+uint32_t Aligner::drvStatusBytes() {
+  using namespace tmc51x0;
+
+  tmc51x0::Registers::DrvStatus drv_status;
+  drv_status.bytes = this->aligner.registers.read(Registers::DrvStatusAddress);
+
+  return drv_status.bytes;
+}
+
+void Aligner::reinit() {
+  digitalWrite(ALIGNER_CS_PIN, HIGH);
+
+  this->aligner.reinitialize();
 }
