@@ -2,16 +2,19 @@
 
 #include <Arduino.h>
 #include <NewPing.h>
+#include "Commons/TimedComponent.h"
 
-#define TENSIONER_TRIGGER_PIN 6
-#define TENSIONER_ECHO_PIN 7
+#define TENSIONER_MIN_HARD_LIMIT 40
+#define TENSIONER_SETPOINT 140
+#define TENSIONER_MAX_DISTANCE 300
+#define TENSIONER_START_THRESHOLD 170
 
-class Tensioner {
-  private:
-    unsigned long tensioner_loop_last_millis = 0;
+class Tensioner : public TimedComponent {
   public:
-    float distance;
+    Tensioner() : TimedComponent() {}
+
+    uint16_t distance;
 
     void setup();
-    void loop(unsigned long interval = 0);
+    void execute() override;
 };

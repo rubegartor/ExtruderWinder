@@ -1,25 +1,24 @@
-#include <Screen/components/popupTab.h>
+#include <UI/components/popupTab.h>
+#include "Commons/globals.h"
 
 static void cancel_popup(lv_event_t *event) {
-  lv_tabview_set_act(tabview, atoi(lv_label_get_text(activeTabIndex)), LV_ANIM_OFF);
+  // Obtener el tab original desde el dato de usuario del tabview
+  uint32_t originalTab = (uint32_t)(uintptr_t)lv_obj_get_user_data(tabview);
+  lv_tabview_set_act(tabview, originalTab, LV_ANIM_OFF);
+  clearConfirmationCallback(); // Limpiar el callback si se cancela
 }
 
 static void ok_popup(lv_event_t *event) {
-  lv_tabview_set_act(tabview, atoi(lv_label_get_text(activeTabIndex)), LV_ANIM_OFF);
-
-  if (getConfirmationMenuAction() == "resetMeasure") {
-    measurement.reset();
-  }
+  executeConfirmationCallback(); // Ejecutar el callback configurado (que ya maneja volver al tab)
 }
 
 void build_popupTab(lv_obj_t *parent) {
-  lv_obj_t *infoLabel = lv_label_create(parent);
-  lv_label_set_text(infoLabel, "Quieres continuar?");
-  lv_obj_align(infoLabel, LV_ALIGN_TOP_MID, 0, 140);
+  popupInfoLabel = lv_label_create(parent);
+  lv_obj_align(popupInfoLabel, LV_ALIGN_TOP_MID, 0, 140);
 
   lv_obj_t *btnGroup = lv_obj_create(parent);
   lv_obj_set_size(btnGroup, lv_obj_get_width(parent) / 1.25, LV_SIZE_CONTENT);
-  lv_obj_align_to(btnGroup, infoLabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 50);
+  lv_obj_align_to(btnGroup, popupInfoLabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 50);
   lv_obj_set_style_bg_opa(btnGroup, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(btnGroup, 0, 0);
 

@@ -1,28 +1,27 @@
-#include <Arduino.h>
-#include "Commons/Commons.h"
-#include "Screen/components/general.h"
-#include "Screen/components/sidebar.h"
-#include "Screen/components/homeTab.h"
-#include "Screen/components/controlTab.h"
-#include "Screen/components/settingsTab.h"
-#include "Screen/components/popupTab.h"
+#include "Commons/globals.h"
+#include "Commons/pins.h"
 
-void setup()
-{
-  Serial.begin(115200);
+#include "UI/components/general.h"
+#include "UI/components/sidebar.h"
+#include "UI/components/homeTab.h"
+#include "UI/components/controlTab.h"
+#include "UI/components/settingsTab.h"
+#include "UI/components/popupTab.h"
 
-  SPI1.begin();
+void setup() {
+  initGlobals();
 
-  initCommons();
+  aligner.setInterval(80);
+  puller.setInterval(80);
+  spooler.setInterval(80);
+  tensioner.setInterval(100);
+  measurement.setInterval(15);
 
   measurement.setup();
-  aligner.setup();
   puller.setup();
+  aligner.setup();
   spooler.setup();
   tensioner.setup();
-
-  Display.begin();
-  TouchDetector.begin();
 
   build_sidebar();
   build_homeTab(tab1);
@@ -33,17 +32,12 @@ void setup()
   setupUITimer();
 }
 
-unsigned long lvglMillis = 0;
-
 void loop() {
-  if (millis() - lvglMillis >= 5) {
-    lv_task_handler();
-    lvglMillis = millis();
-  }
+  lv_timer_handler_run_in_period(5);
 
+  measurement.loop();
   aligner.loop();
   puller.loop();
   spooler.loop();
-  tensioner.loop(250);
-  measurement.loop();
+  tensioner.loop();
 }

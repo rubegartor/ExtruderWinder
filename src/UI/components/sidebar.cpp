@@ -1,8 +1,7 @@
-#include <Arduino.h>
-#include <Screen/components/sidebar.h>
-#include <Screen/components/homeTab.h>
-#include <Screen/components/popupTab.h>
-#include <Screen/components/general.h>
+#include <UI/components/sidebar.h>
+#include <UI/components/homeTab.h>
+#include <UI/components/popupTab.h>
+#include <UI/components/general.h>
 
 lv_obj_t *homeBtn, *listBtn, *settingsBtn;
 
@@ -16,8 +15,6 @@ static void open_home_tab(lv_event_t *event) {
   lv_obj_set_style_text_color(lv_obj_get_child(listBtn, 0), lv_color_hex(0xFFFFFF), 0);
   lv_obj_set_style_text_color(lv_obj_get_child(settingsBtn, 0), lv_color_hex(0xFFFFFF), 0);
 
-  setActiveTab(0);
-
   lv_tabview_set_act(tabview, 0, LV_ANIM_OFF);
 }
 
@@ -29,8 +26,6 @@ static void open_list_tab(lv_event_t *event) {
 
   lv_obj_set_style_text_color(lv_obj_get_child(homeBtn, 0), lv_color_hex(0xFFFFFF), 0);
   lv_obj_set_style_text_color(lv_obj_get_child(settingsBtn, 0), lv_color_hex(0xFFFFFF), 0);
-
-  setActiveTab(1);
 
   lv_tabview_set_act(tabview, 1, LV_ANIM_OFF);
 }
@@ -44,15 +39,10 @@ static void open_settings_tab(lv_event_t *event) {
   lv_obj_set_style_text_color(lv_obj_get_child(homeBtn, 0), lv_color_hex(0xFFFFFF), 0);
   lv_obj_set_style_text_color(lv_obj_get_child(listBtn, 0), lv_color_hex(0xFFFFFF), 0);
 
-  setActiveTab(2);
-
   lv_tabview_set_act(tabview, 2, LV_ANIM_OFF);
 }
 
 void build_sidebar() {
-    activeTabIndex = lv_label_create(lv_scr_act());
-    confirmationMenuAction = lv_label_create(lv_scr_act());
-
     //Tabs
     tabview = lv_tabview_create(lv_scr_act());
     lv_tabview_set_tab_bar_position(tabview, LV_DIR_LEFT);

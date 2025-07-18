@@ -1,79 +1,173 @@
-#include "Measurement.h" 
+#include "Measurement/Measurement.h"
+#include "Commons/pins.h"
+#include "Commons/globals.h"
+#include "UI/components/general.h"
 
-// https://gist.github.com/kesor/3577811486a4032baed0549bbc61c4df
+enum class ReadState {
+  IDLE,
+  READING,
+  DONE
+};
 
-volatile unsigned long lastClock = 0;
-volatile bool lastClockState = LOW;
+volatile uint8_t fullSPCData[52];
+volatile uint8_t spcdata[13];
+volatile ReadState spcState = ReadState::IDLE;
+volatile uint8_t bitBuffer = 0;  // almacena temporalmente 4 bits
+volatile uint8_t totalBits = 0;  // de 0-51 (13 * 4)
+volatile unsigned long lastMicros = 0;
 
-volatile byte dataBits[MEASUREMENT_BITS];
-volatile int bitCount = 0;
+void readBitISR() {
+  unsigned long now = micros();
+  if (now - lastMicros < MITUTOYO_CLK_DEBOUNCE) return;
+  lastMicros = now;
 
-const unsigned long IDLE_TIME = 100000;
-const unsigned long DEBOUNCE_US = 20;
+  if (spcState != ReadState::READING || totalBits >= 52) return;
 
-void _CLK_ISR() {
-  unsigned long currentUS = micros();
+  // Desplaza el buffer y añade el nuevo bit (MSB first)
+  bitBuffer = (bitBuffer >> 1) | (digitalRead(MEASUREMENT_DATA_PIN) << 3);
 
-  if (currentUS - lastClock < DEBOUNCE_US)
-    return;
+  fullSPCData[totalBits] = bitBuffer;
+  totalBits++;
 
-  if (currentUS - lastClock > IDLE_TIME)
-    bitCount = 0;
+  if (totalBits % 4 == 0) {
+    uint8_t idx = (totalBits / 4) - 1;
+    spcdata[idx] = bitBuffer;
 
-  bool state = digitalRead(CLOCK_PIN);
+    // Si la cabezera no es 0xF, reinicia la lectura (sincronización)
+    if (idx < 4 && bitBuffer != 0xF) {
+      totalBits = 0;
+      bitBuffer = 0;
+      return;
+    }
 
-  if (lastClockState == LOW && state == HIGH && bitCount == MEASUREMENT_BITS) {
-    dataBits[bitCount - 1] = digitalRead(DATA_PIN);
-    bitCount++;
+    bitBuffer = 0;
+
+    if (totalBits == 52) {
+      digitalWrite(MEASUREMENT_REQ_PIN, HIGH);
+      spcState = ReadState::DONE;
+    }
   }
-
-  if (lastClockState == HIGH && state == LOW && bitCount < MEASUREMENT_BITS) {
-    dataBits[bitCount] = digitalRead(DATA_PIN);
-    bitCount++;
-  }
-
-  lastClockState = state;
-  lastClock = currentUS;
 }
 
-void Measurement::decode() {
-  int8_t sign = 1;
-  int16_t value = 0;
-
-  if (dataBits[0] != 1)
-    return;
-
-  for (int i = 0; i <= 20; i++)
-    if (dataBits[i + 1])
-      value |= 1 << i;
-
-  sign = (dataBits[21] == 1) ? -1 : 1;
-
-  unsigned long currentMillis = millis();
-  if (currentMillis - measurement_decode_last_millis >= DATA_OUTPUT_RATE_MS) {
-    measurement_decode_last_millis = currentMillis;
-    this->lastRead = (value * sign) / 100.0;
+bool isValidSPCFrame(const volatile uint8_t* data) {
+  // Cabecera: d1–d4 deben ser 0xF
+  for (uint8_t i = 0; i < 4; i++) {
+    if (data[i] != 0xF) return false;
   }
+  // Signo: d5 debe ser 0x0 o 0x8
+  if (data[4] != 0x0 && data[4] != 0x8) return false;
+  // Dígitos: d6–d11 deben ser 0–9
+  for (uint8_t i = 5; i <= 10; i++) {
+    if (data[i] > 9) return false;
+  }
+  // Punto decimal: d12 debe ser 2–5
+  if (data[11] < 2 || data[11] > 5) return false;
+  // Unidad: d13 debe ser 0 o 1
+  if (data[12] > 1) return false;
+  return true;
 }
 
 void Measurement::setup() {
-  pinMode(CLOCK_PIN, INPUT);
-  pinMode(DATA_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(CLOCK_PIN), _CLK_ISR, CHANGE);
+  memset((void*)spcdata, 0, sizeof(spcdata));
+  memset((void*)fullSPCData, 0, sizeof(fullSPCData));
+
+  attachInterrupt(digitalPinToInterrupt(MEASUREMENT_CLK_PIN), readBitISR, FALLING);
+  pinMode(MEASUREMENT_CLK_PIN, INPUT_PULLDOWN);
+  pinMode(MEASUREMENT_DATA_PIN, INPUT_PULLUP);
+  pinMode(MEASUREMENT_REQ_PIN, OUTPUT);
+  digitalWrite(MEASUREMENT_REQ_PIN, HIGH);
 }
 
-void Measurement::loop() {
-  if (bitCount > MEASUREMENT_BITS) decode();
+void Measurement::execute() {
+  if (spcState == ReadState::IDLE) {
+    totalBits = 0;
+    bitBuffer = 0;
+    memset((void*)spcdata, 0, sizeof(spcdata));
+    memset((void*)fullSPCData, 0, sizeof(fullSPCData));
+    spcState = ReadState::READING;
+    digitalWrite(MEASUREMENT_REQ_PIN, LOW);
+  }
+
+  if (spcState != ReadState::DONE) return;
+
+  if (!isValidSPCFrame(spcdata)) {
+    spcState = ReadState::IDLE;
+    return;
+  }
+
+  float value = 0.0f;
+  for (uint8_t i = 5; i <= 10; i++) {
+    value = value * 10 + spcdata[i];
+  }
+
+  value /= pow(10, spcdata[11]);
+
+  if (spcdata[4] & 0x8) {
+    value = -value;
+  }
+
+  if (fabs(value) > MEASUREMENT_LIMIT) {
+    spcState = ReadState::IDLE;
+    return;
+  }
+
+  // Aplicar filtro para evitar errores temporales
+  if (shouldFilterReading(value)) {
+    spcState = ReadState::IDLE;
+    return;
+  }
+
+  // Procesar lectura válida
+  processValidReading(value);
+
+  spcState = ReadState::IDLE;
+}
+
+void Measurement::reset() {
+  this->minRead = this->maxRead = this->lastRead;
+  this->previousValidRead = this->lastRead;
+  this->hasSuspectedRead = false;
+
+  puller.resetRevolutionCount();
+}
+
+bool Measurement::shouldFilterReading(float newValue) {
+  // Si no hay lectura anterior válida, no filtrar
+  if (this->previousValidRead == 0.00f && this->lastRead == 0.00f) {
+    return false;
+  }
+  
+  // Calcular la diferencia con la lectura anterior válida
+  float diff = fabs(newValue - this->previousValidRead);
+  
+  // Si la diferencia es exactamente 1.0f, verificar si ya teníamos una lectura sospechosa
+  if (fabs(diff - 1.0f) < 0.001f) { // Usar tolerancia para comparación de flotantes
+    if (this->hasSuspectedRead && fabs(newValue - this->suspectedRead) < 0.001f) {
+      // Es la segunda lectura consecutiva con la misma diferencia de 1.0f, aceptarla
+      return false;
+    } else {
+      // Primera vez que vemos esta diferencia de 1.0f, marcarla como sospechosa
+      this->suspectedRead = newValue;
+      this->hasSuspectedRead = true;
+      return true; // Filtrar esta lectura
+    }
+  } else {
+    // La diferencia no es 1.0f, reiniciar el estado de lectura sospechosa
+    this->hasSuspectedRead = false;
+    return false; // No filtrar
+  }
+}
+
+void Measurement::processValidReading(float value) {
+  this->lastRead = value;
+  this->previousValidRead = value;
+  this->hasSuspectedRead = false; // Reiniciar estado de lectura sospechosa
+  
+  addChartValue(static_cast<int32_t>(this->lastRead * 100));
 
   if (this->lastRead < this->minRead) {
     this->minRead = this->lastRead;
   } else if (this->lastRead > this->maxRead) {
     this->maxRead = this->lastRead;
   }
-}
-
-void Measurement::reset() {
-  this->minRead = this->lastRead;
-  this->maxRead = this->lastRead;
-  this->lastRead = 0;
 }
