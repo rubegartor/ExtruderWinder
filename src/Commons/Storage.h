@@ -9,10 +9,12 @@ class Storage {
     String getString(const char* key, const char* defaultValue);
     int getInt(const char* key, int defaultValue);
     float getFloat(const char* key, float defaultValue);
+    bool getBool(const char* key, bool defaultValue);
 
     void setString(const char* key, const char* value);
     void setInt(const char* key, int value);
     void setFloat(const char* key, float value);
+    void setBool(const char* key, bool value);
 
     void remove(const char* key);
 };

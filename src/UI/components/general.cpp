@@ -8,14 +8,14 @@ lv_obj_t *tabview, *tab1, *tab2, *tab3, *tab4;
 lv_obj_t *popupInfoLabel;
 lv_obj_t *minMeasureLabel, *actMeasureLabel, *maxMeasureLabel;
 lv_obj_t *winderInfoPullerSpeedLabel, *winderInfoWeightLabel, *winderInfoWeightLabelIcon, *winderInfoWeightLabelType;
-lv_obj_t *minSpeedSpinbox, *maxSpeedSpinbox, *diameterSpinbox;
+lv_obj_t *minSpeedSpinbox, *maxSpeedSpinbox, *diameterSpinbox, *alertWeightSpinbox;
 lv_obj_t *positionBar, *homePositionBtn, *startSpoolCalibrationBtn, *positionBarMinLabel, *positionBarMaxLabel;
 lv_obj_t *moveLeftBtn, *moveRightBtn;
+lv_obj_t *wifiIPLabel;
 
 lv_obj_t *chart, *chartMaxLabel, *chartMinLabel;
 lv_chart_series_t *ser;
 
-// Variable global para almacenar el callback de confirmación actual
 static ConfirmationCallback currentConfirmationCallback = nullptr;
 static uint32_t originalTabIndex = 0;
 
@@ -28,7 +28,7 @@ void setConfirmationCallback(ConfirmationCallback callback, uint32_t originalTab
 void executeConfirmationCallback() {
   if (currentConfirmationCallback != nullptr) {
     currentConfirmationCallback(originalTabIndex);
-    currentConfirmationCallback = nullptr; // Limpiar después de ejecutar
+    currentConfirmationCallback = nullptr;
     originalTabIndex = 0;
   }
 }
@@ -42,9 +42,9 @@ void update_ui(lv_timer_t *timer) {
   lv_label_set_text_fmt(winderInfoPullerSpeedLabel, "%d", puller.speed);
   lv_label_set_text_fmt(winderInfoWeightLabel, "%.1f g", getExtrudedFilamentWeight());
 
-  lv_label_set_text_fmt(actMeasureLabel, "%.2f", measurement.lastRead);
-  lv_label_set_text_fmt(minMeasureLabel, "%.2f", measurement.minRead);
-  lv_label_set_text_fmt(maxMeasureLabel, "%.2f", measurement.maxRead);
+  lv_label_set_text_fmt(actMeasureLabel, "%.2f", measurementLastRead);
+  lv_label_set_text_fmt(minMeasureLabel, "%.2f", measurementMinRead);
+  lv_label_set_text_fmt(maxMeasureLabel, "%.2f", measurementMaxRead);
 
   if (!aligner.isHoming()) {
     lv_bar_set_value(positionBar, aligner.currentPosition(), LV_ANIM_ON);
@@ -52,26 +52,29 @@ void update_ui(lv_timer_t *timer) {
 
   if (startExtensionLabel) {
     int32_t startSteps = aligner.getStartExtensionSteps();
-    if (startSteps >= 0) {
-      lv_label_set_text_fmt(startExtensionLabel, "Inicio: +%d", (int)startSteps);
-    } else {
-      lv_label_set_text_fmt(startExtensionLabel, "Inicio: %d", (int)startSteps);
-    }
-    // Realinear la etiqueta después de cambiar el texto
+    lv_label_set_text_fmt(startExtensionLabel, startSteps >= 0 ? "Inicio: +%d" : "Inicio: %d", (int)startSteps);
     if (moveLeftBtn) {
       lv_obj_align_to(startExtensionLabel, moveLeftBtn, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
     }
   }
+
   if (endExtensionLabel) {
     int32_t endSteps = aligner.getEndExtensionSteps();
-    if (endSteps >= 0) {
-      lv_label_set_text_fmt(endExtensionLabel, "Final: +%d", (int)endSteps);
-    } else {
-      lv_label_set_text_fmt(endExtensionLabel, "Final: %d", (int)endSteps);
-    }
-    // Realinear la etiqueta después de cambiar el texto
+    lv_label_set_text_fmt(endExtensionLabel, endSteps >= 0 ? "Final: +%d" : "Final: %d", (int)endSteps);
     if (moveRightBtn) {
       lv_obj_align_to(endExtensionLabel, moveRightBtn, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+    }
+  }
+
+  if (wifiIPLabel) {
+    if (rpcManager.hasNewWebServerInfo()) {
+      const WebServerMessage& config = rpcManager.getWebServerInfo();
+      if (strlen(config.wifiIP) > 0) {
+        lv_label_set_text_fmt(wifiIPLabel, "WiFi: %s", config.wifiIP);
+      } else {
+        lv_label_set_text(wifiIPLabel, "WiFi: Desconectado");
+      }
+      rpcManager.markWebServerInfoProcessed();
     }
   }
 }

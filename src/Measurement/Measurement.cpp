@@ -1,7 +1,5 @@
 #include "Measurement/Measurement.h"
 #include "Commons/pins.h"
-#include "Commons/globals.h"
-#include "UI/components/general.h"
 
 enum class ReadState {
   IDLE,
@@ -23,6 +21,9 @@ void readBitISR() {
 
   if (spcState != ReadState::READING || totalBits >= 52) return;
 
+  // Verificar que los pines sean válidos antes de leer
+  if (MEASUREMENT_DATA_PIN >= NUM_DIGITAL_PINS) return;
+
   // Desplaza el buffer y añade el nuevo bit (MSB first)
   bitBuffer = (bitBuffer >> 1) | (digitalRead(MEASUREMENT_DATA_PIN) << 3);
 
@@ -31,6 +32,8 @@ void readBitISR() {
 
   if (totalBits % 4 == 0) {
     uint8_t idx = (totalBits / 4) - 1;
+    if (idx >= 13) return; // Protección adicional contra desbordamiento
+    
     spcdata[idx] = bitBuffer;
 
     // Si la cabezera no es 0xF, reinicia la lectura (sincronización)
@@ -43,7 +46,9 @@ void readBitISR() {
     bitBuffer = 0;
 
     if (totalBits == 52) {
-      digitalWrite(MEASUREMENT_REQ_PIN, HIGH);
+      if (MEASUREMENT_REQ_PIN < NUM_DIGITAL_PINS) {
+        digitalWrite(MEASUREMENT_REQ_PIN, HIGH);
+      }
       spcState = ReadState::DONE;
     }
   }
@@ -65,6 +70,15 @@ bool isValidSPCFrame(const volatile uint8_t* data) {
   // Unidad: d13 debe ser 0 o 1
   if (data[12] > 1) return false;
   return true;
+}
+
+bool Measurement::isFirstDigitError(float newValue, float previousValue) {
+  // Si no tenemos una lectura previa válida, aceptamos la nueva
+  if (previousValue == 0.0f) return false;
+  
+  // Si el cambio es mayor de 1.0f, consideramos que puede ser un error del primer dígito
+  float diff = fabs(newValue - previousValue);
+  return diff > 1.0f;
 }
 
 void Measurement::setup() {
@@ -97,77 +111,52 @@ void Measurement::execute() {
 
   float value = 0.0f;
   for (uint8_t i = 5; i <= 10; i++) {
+    if (spcdata[i] > 9) { // Verificación adicional de seguridad
+      spcState = ReadState::IDLE;
+      return;
+    }
     value = value * 10 + spcdata[i];
   }
 
-  value /= pow(10, spcdata[11]);
+  // Verificar que el divisor sea válido antes de la división
+  uint8_t decimalPlaces = spcdata[11];
+  if (decimalPlaces < 2 || decimalPlaces > 5) {
+    spcState = ReadState::IDLE;
+    return;
+  }
+
+  value /= pow(10, decimalPlaces);
 
   if (spcdata[4] & 0x8) {
     value = -value;
   }
 
-  if (fabs(value) > MEASUREMENT_LIMIT) {
+  // Verificación adicional contra valores NaN e infinitos
+  if (!isfinite(value) || fabs(value) > MEASUREMENT_LIMIT) {
     spcState = ReadState::IDLE;
     return;
   }
 
-  // Aplicar filtro para evitar errores temporales
-  if (shouldFilterReading(value)) {
+  // Filtrar errores del primer dígito comparando con la lectura anterior
+  if (isFirstDigitError(value, this->previousValidRead) && this->rejectedReadCount < MAX_REJECTED_READS) {
+    this->rejectedReadCount++;
     spcState = ReadState::IDLE;
     return;
   }
 
-  // Procesar lectura válida
-  processValidReading(value);
-
-  spcState = ReadState::IDLE;
-}
-
-void Measurement::reset() {
-  this->minRead = this->maxRead = this->lastRead;
-  this->previousValidRead = this->lastRead;
-  this->hasSuspectedRead = false;
-
-  puller.resetRevolutionCount();
-}
-
-bool Measurement::shouldFilterReading(float newValue) {
-  // Si no hay lectura anterior válida, no filtrar
-  if (this->previousValidRead == 0.00f && this->lastRead == 0.00f) {
-    return false;
-  }
-  
-  // Calcular la diferencia con la lectura anterior válida
-  float diff = fabs(newValue - this->previousValidRead);
-  
-  // Si la diferencia es exactamente 1.0f, verificar si ya teníamos una lectura sospechosa
-  if (fabs(diff - 1.0f) < 0.001f) { // Usar tolerancia para comparación de flotantes
-    if (this->hasSuspectedRead && fabs(newValue - this->suspectedRead) < 0.001f) {
-      // Es la segunda lectura consecutiva con la misma diferencia de 1.0f, aceptarla
-      return false;
-    } else {
-      // Primera vez que vemos esta diferencia de 1.0f, marcarla como sospechosa
-      this->suspectedRead = newValue;
-      this->hasSuspectedRead = true;
-      return true; // Filtrar esta lectura
-    }
-  } else {
-    // La diferencia no es 1.0f, reiniciar el estado de lectura sospechosa
-    this->hasSuspectedRead = false;
-    return false; // No filtrar
-  }
-}
-
-void Measurement::processValidReading(float value) {
+  // Si llegamos aquí, la lectura es válida o hemos superado el límite de rechazos
   this->lastRead = value;
-  this->previousValidRead = value;
-  this->hasSuspectedRead = false; // Reiniciar estado de lectura sospechosa
-  
-  addChartValue(static_cast<int32_t>(this->lastRead * 100));
+  this->previousValidRead = value;  // Actualizar la lectura válida anterior
+  this->rejectedReadCount = 0;     // Resetear el contador de rechazos
+  this->lastUpdateTime = millis();
 
   if (this->lastRead < this->minRead) {
     this->minRead = this->lastRead;
   } else if (this->lastRead > this->maxRead) {
     this->maxRead = this->lastRead;
   }
+
+  rpcManager.sendMeasurementData(this->lastRead, this->minRead, this->maxRead);
+
+  spcState = ReadState::IDLE;
 }

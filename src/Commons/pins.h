@@ -10,3 +10,5 @@
 
 #define TENSIONER_TRIGGER_PIN 4
 #define TENSIONER_ECHO_PIN 5
+
+#define BUZZER_PIN 6

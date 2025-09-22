@@ -8,19 +8,19 @@
 #include "UI/components/settingsTab.h"
 #include "UI/components/popupTab.h"
 
-void setup() {
+void setup() {  
   initGlobals();
 
   aligner.setInterval(80);
   puller.setInterval(80);
-  spooler.setInterval(80);
+  spooler.setInterval(100);
   tensioner.setInterval(100);
-  measurement.setInterval(15);
 
-  measurement.setup();
+#ifndef WITHOUT_MOTOR_CONTROL
   puller.setup();
   aligner.setup();
   spooler.setup();
+#endif
   tensioner.setup();
 
   build_sidebar();
@@ -35,7 +35,19 @@ void setup() {
 void loop() {
   lv_timer_handler_run_in_period(5);
 
-  measurement.loop();
+  rpcManager.loop();
+  if (rpcManager.hasNewMeasurementData()) {
+    const MeasurementDataMessage& data = rpcManager.getMeasurementData();
+    
+    measurementLastRead = data.lastRead;
+    measurementMinRead = data.minRead;
+    measurementMaxRead = data.maxRead;
+
+    addChartValue(static_cast<int32_t>(data.lastRead * 100));
+
+    rpcManager.markMeasurementDataProcessed();
+  }
+
   aligner.loop();
   puller.loop();
   spooler.loop();

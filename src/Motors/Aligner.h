@@ -4,8 +4,8 @@
 #include "Commons/TimedComponent.h"
 
 #define STEPS_PER_CM 52350
-
 #define MAX_ALIGNER_POSITION (STEPS_PER_CM * 13)
+#define MANUAL_MOVE_DELAY 25
 
 enum AlignerDirection {
   FORWARD,
@@ -49,7 +49,7 @@ private:
   // Variables para extensiones de posición
   int32_t startExtension = 0;  // Extensión hacia la izquierda desde startPos
   int32_t endExtension = 0;    // Extensión hacia la derecha desde endPos
-    
+
 public:
   bool canMoveLeft = false;
   bool canMoveRight = false;
@@ -84,10 +84,16 @@ public:
   int32_t getEffectiveStartPos();
   int32_t getEffectiveEndPos();
   
+  AlignerState getCurrentState() const { return currentState; }
+  AlignerDirection getCurrentDirection() const { return direction; }
+  int32_t getStartExtension() const { return startExtension; }
+  int32_t getEndExtension() const { return endExtension; }
+  
   void waitFor(unsigned long durationMs, AlignerState nextState);
 
   void reinit();
-  
+  bool enabled();
+
 private:
   void applyParameters(AlignerParameterMode mode);
   void resetPositions();

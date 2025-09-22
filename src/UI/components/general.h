@@ -18,17 +18,17 @@ LV_FONT_DECLARE(icons);
 extern Arduino_H7_Video Display;
 extern Arduino_GigaDisplayTouch TouchDetector;
 
-// Callback que recibe el tab de origen para poder volver después
 typedef void (*ConfirmationCallback)(uint32_t originalTab);
 
 extern lv_obj_t *tabview, *tab1, *tab2, *tab3, *tab4;
 extern lv_obj_t *popupInfoLabel;
 extern lv_obj_t *minMeasureLabel, *actMeasureLabel, *maxMeasureLabel;
 extern lv_obj_t *winderInfoPullerSpeedLabel, *winderInfoWeightLabel, *winderInfoWeightLabelIcon, *winderInfoWeightLabelType;
-extern lv_obj_t *minSpeedSpinbox, *maxSpeedSpinbox, *diameterSpinbox;
+extern lv_obj_t *minSpeedSpinbox, *maxSpeedSpinbox, *diameterSpinbox, *alertWeightSpinbox;
 extern lv_obj_t *positionBar, *homePositionBtn, *startSpoolCalibrationBtn, *positionBarMinLabel, *positionBarMaxLabel;
 extern lv_obj_t *startExtensionLabel, *endExtensionLabel;
-extern lv_obj_t *moveLeftBtn, *moveRightBtn; // Referencias para realineación de etiquetas
+extern lv_obj_t *moveLeftBtn, *moveRightBtn;
+extern lv_obj_t *wifiIPLabel;
 
 extern lv_obj_t *chart, *chartMaxLabel, *chartMinLabel;
 extern lv_chart_series_t *ser;

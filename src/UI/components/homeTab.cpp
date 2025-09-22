@@ -23,7 +23,7 @@ static void reset_measure_btn_cb(lv_event_t *e) {
     lv_obj_set_user_data(tabview, (void*)(uintptr_t)currentTab);
     
     setConfirmationCallback([](uint32_t originalTab) {
-      measurement.reset();
+      resetMeasurements();
       lv_tabview_set_act(tabview, originalTab, LV_ANIM_OFF);
     }, currentTab, "Continuar con el reset de medidas?");
     

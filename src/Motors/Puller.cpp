@@ -1,11 +1,12 @@
 #include "Puller.h"
 #include "Commons/pins.h"
 #include "Commons/globals.h"
+#include "Stepper.h"
 
 const tmc51x0::SpiParameters spi_parameters =
 {
   .spi_ptr = &SPI_INTERFACE,
-  .clock_rate = 2000000,
+  .clock_rate = TMC5160_SPI_FREQ,
   .chip_select_pin = PULLER_CS_PIN
 };
 
@@ -19,7 +20,7 @@ const tmc51x0::ConverterParameters converter_parameters =
 const tmc51x0::DriverParameters driver_parameters_real =
 {
   .global_current_scaler = 100,
-  .run_current = 25,
+  .run_current = 30,
   .hold_current = 20,
   .hold_delay = 5,
   .pwm_offset = 30,
@@ -97,7 +98,7 @@ void Puller::setupPID() {
 }
 
 void Puller::execute() {
-  this->input = measurement.lastRead;
+  this->input = measurementLastRead;
 
   double gap = abs(this->setPoint - this->input);
 

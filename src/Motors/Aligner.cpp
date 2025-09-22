@@ -2,10 +2,11 @@
 #include "Commons/pins.h"
 #include "Commons/globals.h"
 #include "UI/components/general.h"
+#include "Stepper.h"
 
 const tmc51x0::SpiParameters spi_parameters = {
   .spi_ptr = &SPI_INTERFACE,
-  .clock_rate = 2000000,
+  .clock_rate = TMC5160_SPI_FREQ,
   .chip_select_pin = ALIGNER_CS_PIN
 };
 
@@ -67,6 +68,7 @@ tmc51x0::ControllerParameters getControllerParameters(AlignerParameterMode mode)
 void Aligner::setup() {
   motor.setupSpi(spi_parameters);
   motor.converter.setup(converter_parameters);
+
   applyParameters(AlignerParameterMode::NORMAL_OPERATION);
   
   motor.driver.enable();
@@ -80,6 +82,10 @@ void Aligner::setup() {
 
 void Aligner::execute() {
   handleStateMachine();
+
+  if (!this->enabled()) {
+    this->reinit();
+  }
 
   lastKnownPosition = motor.controller.readActualPosition();
 }
@@ -161,7 +167,7 @@ void Aligner::handleWaiting() {
 }
 
 void Aligner::handleManualMovement() {
-  if (millis() - aligner_manual_movement_last_millis >= 25) {
+  if (millis() - aligner_manual_movement_last_millis >= MANUAL_MOVE_DELAY) {
     if (canMoveRight) {
       moveTo(aligner_to_move);
     } else if (canMoveLeft) {
@@ -181,21 +187,27 @@ void Aligner::moveTo(int32_t position) {
 void Aligner::onSpoolerRevolution() {
   if (currentState != AlignerState::AUTO_MOVE) return;
 
+  // Paso base según dirección
   int32_t step = (direction == AlignerDirection::FORWARD) ? aligner_to_move : -aligner_to_move;
-  step = (step * 1.35f);
-  int32_t nextPosition = motor.controller.readTargetPosition() + step;
+  // Escalado con redondeo al entero más cercano para evitar sesgos por truncado
+  float scaled = step * 1.35f;
+  int32_t stepScaled = static_cast<int32_t>(scaled + (scaled >= 0.0f ? 0.5f : -0.5f));
+  int32_t nextPosition = motor.controller.readTargetPosition() + stepScaled;
 
   int32_t effectiveEndPos = getEffectiveEndPos();
   int32_t effectiveStartPos = getEffectiveStartPos();
 
   if (nextPosition >= effectiveEndPos) {
     direction = AlignerDirection::BACKWARD;
-    nextPosition = effectiveEndPos - aligner_to_move;
+    // Aterrizar exactamente en el límite derecho
+    nextPosition = effectiveEndPos;
   } else if (nextPosition <= effectiveStartPos) {
     direction = AlignerDirection::FORWARD;
-    nextPosition = effectiveStartPos + aligner_to_move;
+    // Aterrizar exactamente en el límite izquierdo
+    nextPosition = effectiveStartPos;
   }
   
+  // Escribir posición saturada dentro de [start, end]
   motor.controller.writeTargetPosition(max(effectiveStartPos, min(nextPosition, effectiveEndPos)));
 }
 
@@ -256,7 +268,7 @@ void Aligner::resetPositions() {
 }
 
 void Aligner::setStartPosition() {
-  startPos = motor.controller.readActualPosition() + aligner_to_move;
+  startPos = motor.controller.readActualPosition();
   startPositionSet = true;
 
   motor.controller.writeTargetPosition(MAX_ALIGNER_POSITION * 2);
@@ -264,7 +276,7 @@ void Aligner::setStartPosition() {
 }
 
 void Aligner::setEndPosition() {
-  endPos = motor.controller.readActualPosition() - (aligner_to_move * 2);
+  endPos = motor.controller.readActualPosition();
   motor.controller.writeTargetPosition(endPos);
   endPositionSet = true;
   applyParameters(AlignerParameterMode::NORMAL_OPERATION);
@@ -309,11 +321,16 @@ int32_t Aligner::getEndExtensionSteps() {
 }
 
 int32_t Aligner::getEffectiveStartPos() {
-  return startPos - startExtension;
+  // startExtension desplaza el límite hacia la izquierda (negativo en posición)
+  int32_t s = startPos - startExtension;
+  int32_t e = endPos + endExtension;
+  return (s <= e) ? s : e; // evitar invertir límites
 }
 
 int32_t Aligner::getEffectiveEndPos() {
-  return endPos + endExtension;
+  int32_t s = startPos - startExtension;
+  int32_t e = endPos + endExtension;
+  return (e >= s) ? e : s; // evitar invertir límites
 }
 
 void Aligner::reinit() {
@@ -326,4 +343,13 @@ void Aligner::reinit() {
   delay(10);
 
   resetHome(true);
+}
+
+bool Aligner::enabled() {
+  using namespace tmc51x0;
+
+  tmc51x0::Registers::Chopconf chopConf;
+  chopConf.bytes = motor.registers.read(Registers::ChopconfAddress);
+
+  return chopConf.toff != 0;
 }

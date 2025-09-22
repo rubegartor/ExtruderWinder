@@ -1,11 +1,12 @@
 #include "Spooler.h"
 #include "Commons/pins.h"
 #include "Commons/globals.h"
+#include "Stepper.h"
 
 const tmc51x0::SpiParameters spi_parameters =
 {
   .spi_ptr = &SPI_INTERFACE,
-  .clock_rate = 2000000,
+  .clock_rate = TMC5160_SPI_FREQ,
   .chip_select_pin = SPOOLER_CS_PIN
 };
 
@@ -19,29 +20,29 @@ const tmc51x0::ConverterParameters converter_parameters =
 const tmc51x0::DriverParameters driver_parameters_real =
 {
   .global_current_scaler = 100,
-  .run_current = 55,
-  .hold_current = 35,
-  .hold_delay = 2,
-  .pwm_offset = 45,
-  .pwm_gradient = 25,
+  .run_current = 85,
+  .hold_current = 25,
+  .hold_delay = 5,
+  .pwm_offset = 30,
+  .pwm_gradient = 10,
   .automatic_current_control_enabled = false,
   .motor_direction = tmc51x0::ForwardDirection,
   .standstill_mode = tmc51x0::NormalMode,
   .chopper_mode = tmc51x0::SpreadCycleMode,
-  .stealth_chop_threshold = 30,
-  .stealth_chop_enabled = true,
-  .cool_step_threshold = 30,
+  .stealth_chop_threshold = 0,
+  .stealth_chop_enabled = false,
+  .cool_step_threshold = 1000,
   .cool_step_min = 1,
-  .cool_step_max = 10,
-  .cool_step_enabled = true,
-  .high_velocity_threshold = 30,
+  .cool_step_max = 0,
+  .cool_step_enabled = false,
+  .high_velocity_threshold = 0,
   .high_velocity_fullstep_enabled = false,
   .high_velocity_chopper_switch_enabled = false,
   .stall_guard_threshold = 0,
   .stall_guard_filter_enabled = false,
   .short_to_ground_protection_enabled = true,
   .enabled_toff = 5,
-  .comparator_blank_time = tmc51x0::ClockCycles16,
+  .comparator_blank_time = tmc51x0::ClockCycles36,
   .dc_time = 0,
   .dc_stall_guard_threshold = 0,
 };
@@ -51,16 +52,7 @@ const tmc51x0::ControllerParameters controller_parameters_real =
   .ramp_mode = tmc51x0::VelocityPositiveMode,
   .stop_mode = tmc51x0::HardMode,
   .max_velocity = 0,
-  .max_acceleration = 10,
-  .start_velocity = 1,
-  .stop_velocity = 10,
-  .first_velocity = 0,
-  .first_acceleration = 0,
-  .max_deceleration = 0,
-  .first_deceleration = 10,
-  .zero_wait_duration = 0,
-  .stall_stop_enabled = false,
-  .min_dc_step_velocity = 0
+  .max_acceleration = 10
 };
 
 void Spooler::setup() {
@@ -102,9 +94,12 @@ void Spooler::setupPID() {
 }
 
 void Spooler::execute() {
+  if (!this->enabled()) {
+    this->reinit();
+  }
+
   if (!aligner.isSpoolCalibrated()) {
     motor.controller.writeMaxVelocity(0);
-    // Reiniciar el conteo cuando no está calibrado
     lastPosition = motor.converter.positionChipToReal(motor.controller.readActualPosition());
     revolutionCount = 0;
     thresholdReached = false;
@@ -113,24 +108,24 @@ void Spooler::execute() {
 
   this->input = float(tensioner.distance);
 
-  // Verificar si se ha alcanzado el threshold
   if (this->input >= TENSIONER_START_THRESHOLD) {
     thresholdReached = true;
   }
 
-  // Si no se ha alcanzado el threshold y es la primera revolución, mantener velocidad 0
   if (!thresholdReached && revolutionCount == 0 && this->input < TENSIONER_START_THRESHOLD) {
     motor.controller.writeMaxVelocity(0);
-    // Actualizar la posición base para el conteo de revoluciones
     lastPosition = motor.converter.positionChipToReal(motor.controller.readActualPosition());
     return;
   }
 
-  if (this->input <= TENSIONER_MIN_HARD_LIMIT) {
-    this->speed = 0;
+  if (tensioner.distance <= TENSIONER_MIN_HARD_LIMIT) {
+    motor.controller.writeMaxAcceleration(motor.converter.accelerationRealToChip(SPOOLER_MAX_SPEED * 2));
+    motor.controller.writeMaxVelocity(0);
+    lastPosition = motor.converter.positionChipToReal(motor.controller.readActualPosition());
+    return;
   } else {
+    motor.controller.writeMaxAcceleration(motor.converter.accelerationRealToChip(10));
     this->pid.Compute();
-
     this->speed = map(this->output, MIN_PID_SPOOLER_OUTPUT_LIMIT, MAX_PID_SPOOLER_OUTPUT_LIMIT, this->maxOutput, this->minOutput);
   }
 
@@ -143,9 +138,26 @@ void Spooler::execute() {
     revolutionCount += completedRevolutions;
     lastPosition = currentPosition;
     
-    // Llamar al aligner por cada revolución completada
     for (int i = 0; i < completedRevolutions; i++) {
       aligner.onSpoolerRevolution();
     }
   }
+}
+
+void Spooler::reinit() {
+  SPI1.end();
+  delay(10);
+  SPI1.begin();
+
+  delay(10);
+  motor.reinitialize();
+}
+
+bool Spooler::enabled() {
+  using namespace tmc51x0;
+
+  tmc51x0::Registers::Chopconf chopConf;
+  chopConf.bytes = motor.registers.read(Registers::ChopconfAddress);
+
+  return chopConf.toff != 0;
 }

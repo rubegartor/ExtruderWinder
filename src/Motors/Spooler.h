@@ -4,8 +4,7 @@
 #include "Commons/TimedComponent.h"
 #include <QuickPID.h>
 
-#define SPOOLER_MAX_SPEED 35
-
+#define SPOOLER_MAX_SPEED 65
 #define MIN_PID_SPOOLER_OUTPUT_LIMIT 0
 #define MAX_PID_SPOOLER_OUTPUT_LIMIT 255
 
@@ -23,6 +22,9 @@ private:
 
   void setupPID();
   void setupDriver();
+
+  void reinit();
+  bool enabled();
     
 public:
   Spooler() : TimedComponent() {}
@@ -34,4 +36,6 @@ public:
 
   void setup();
   void execute() override;
+
+  int32_t getRevolutionCount() const { return revolutionCount; }
 };

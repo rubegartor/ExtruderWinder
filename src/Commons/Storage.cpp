@@ -35,6 +35,10 @@ float Storage::getFloat(const char* key, float defaultValue) {
   return defaultValue;
 }
 
+bool Storage::getBool(const char* key, bool defaultValue) {
+  return this->getInt(key, defaultValue ? 1 : 0) == 1;
+}
+
 void Storage::setString(const char* key, const char* value) {
   kv_set(key, value, strlen(value) + 1, 0);
 }
@@ -49,6 +53,10 @@ void Storage::setFloat(const char* key, float value) {
   char buffer[256];
   snprintf(buffer, sizeof(buffer), "%.6f", value);
   kv_set(key, buffer, strlen(buffer) + 1, 0);
+}
+
+void Storage::setBool(const char* key, bool value) {
+  this->setInt(key, value ? 1 : 0);
 }
 
 void Storage::remove(const char* key) {
