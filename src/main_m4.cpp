@@ -1,7 +1,6 @@
 #include "Commons/globals.h"
 #include "Commons/pins.h"
 
-#include "UI/components/general.h"
 #include "UI/components/sidebar.h"
 #include "UI/components/homeTab.h"
 #include "UI/components/controlTab.h"
@@ -15,6 +14,7 @@ void setup() {
   puller.setInterval(80);
   spooler.setInterval(100);
   tensioner.setInterval(100);
+  measurement.setInterval(15);
 
 #ifndef WITHOUT_MOTOR_CONTROL
   puller.setup();
@@ -22,6 +22,7 @@ void setup() {
   spooler.setup();
 #endif
   tensioner.setup();
+  measurement.setup();
 
   build_sidebar();
   build_homeTab(tab1);
@@ -36,17 +37,7 @@ void loop() {
   lv_timer_handler_run_in_period(5);
 
   rpcManager.loop();
-  if (rpcManager.hasNewMeasurementData()) {
-    const MeasurementDataMessage& data = rpcManager.getMeasurementData();
-    
-    measurementLastRead = data.lastRead;
-    measurementMinRead = data.minRead;
-    measurementMaxRead = data.maxRead;
-
-    addChartValue(static_cast<int32_t>(data.lastRead * 100));
-
-    rpcManager.markMeasurementDataProcessed();
-  }
+  measurement.loop();
 
   aligner.loop();
   puller.loop();

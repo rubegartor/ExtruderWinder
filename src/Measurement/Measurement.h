@@ -23,6 +23,7 @@ class Measurement : public TimedComponent {
 
     void setup();
     void execute() override;
+    void reset();
 
   private:
     RPCManager& rpcManager;

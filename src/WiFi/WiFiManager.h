@@ -5,8 +5,7 @@
 #include <ArduinoJson.h>
 #include "Commons/RPCManager.h"
 
-// Forward declaration
-class Measurement;
+
 
 #define SSE_PERIOD_MS 200
 #define MAX_SSE_CLIENTS 5  // Límite máximo de clientes SSE
@@ -21,7 +20,7 @@ enum WiFiConnectionState {
 
 class WiFiManager {
   public:
-    WiFiManager(RPCManager& rpcMgr, Measurement& measurementRef) : rpcManager(rpcMgr), measurement(measurementRef) {}
+    WiFiManager(RPCManager& rpcMgr) : rpcManager(rpcMgr) {}
     
     void begin();
     void loop();
@@ -38,7 +37,7 @@ class WiFiManager {
     static constexpr size_t STATUS_JSON_CAPACITY = 1024;  // Aumentado para seguridad
     static constexpr size_t STATUS_JSON_BUFFER   = 896;   // Aumentado proporcionalmente
 
-    void buildStatusJson(ArduinoJson::StaticJsonDocument<STATUS_JSON_CAPACITY>& doc, const SystemStatusMessage& data, const MeasurementDataMessage& measurement, unsigned long nowFallback);
+    void buildStatusJson(ArduinoJson::StaticJsonDocument<STATUS_JSON_CAPACITY>& doc, const SystemStatusMessage& data, unsigned long nowFallback);
 
     WiFiServer server;
     
@@ -58,5 +57,4 @@ class WiFiManager {
     
     WiFiConnectionState connectionState = WIFI_NOT_STARTED;
     RPCManager& rpcManager;
-    Measurement& measurement;
 };

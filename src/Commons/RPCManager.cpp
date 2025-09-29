@@ -8,7 +8,6 @@
 RPCManager::RPCManager() 
   : newSystemDataAvailable(false),
     newWebServerInfoAvailable(false),
-    newMeasurementDataAvailable(false),
     sram4Base(nullptr) {
 
 #ifdef CORE_M4
@@ -19,7 +18,6 @@ RPCManager::RPCManager()
 
   memset(&systemDataBuffer, 0, sizeof(SystemStatusMessage));
   memset(&webServerBuffer, 0, sizeof(WebServerMessage));
-  memset(&measurementDataBuffer, 0, sizeof(MeasurementDataMessage));
 }
 
 void RPCManager::begin() {
@@ -53,9 +51,6 @@ void RPCManager::initSharedMemory() {
   
   // Canal 1: M7 → M4 (información del servidor web)
   initChannel(CHANNEL_WEB_SERVER, offset, sizeof(WebServerMessage));
-  
-  // Canal 2: M7 → M4 (datos de medición)
-  initChannel(CHANNEL_MEASUREMENT, offset, sizeof(MeasurementDataMessage));
 }
 
 void RPCManager::initChannel(ChannelType type, size_t& offset, size_t dataSize) {
@@ -75,7 +70,7 @@ void RPCManager::initChannel(ChannelType type, size_t& offset, size_t dataSize) 
 #ifdef CORE_M4
   shouldInit = (type == CHANNEL_SYSTEM_DATA);
 #elif defined(CORE_M7)
-  shouldInit = (type == CHANNEL_WEB_SERVER || type == CHANNEL_MEASUREMENT);
+  shouldInit = (type == CHANNEL_WEB_SERVER);
 #endif
 
   if (shouldInit && channels[type].control) {
@@ -87,12 +82,9 @@ void RPCManager::initChannel(ChannelType type, size_t& offset, size_t dataSize) 
 void RPCManager::receiveMessages() {
   // Procesar todos los canales de recepción según el core
 #ifdef CORE_M4
-  // M4 recibe datos del servidor web y medición
+  // M4 recibe datos del servidor web
   if (receiveData(CHANNEL_WEB_SERVER, &webServerBuffer, sizeof(WebServerMessage))) {
     newWebServerInfoAvailable = true;
-  }
-  if (receiveData(CHANNEL_MEASUREMENT, &measurementDataBuffer, sizeof(MeasurementDataMessage))) {
-    newMeasurementDataAvailable = true;
   }
 #elif defined(CORE_M7)
   // M7 recibe datos del sistema
@@ -112,11 +104,8 @@ bool RPCManager::sendData(ChannelType channel, const void* data, size_t size) {
     return false;
   }
 
-  // Para datos de medición, permitir sobrescribir datos no leídos
-  bool allowOverwrite = (channel == CHANNEL_MEASUREMENT);
-  
-  if (!allowOverwrite && channels[channel].control->dataReady) {
-    return false;  // No sobrescribir datos importantes no leídos
+  if (channels[channel].control->dataReady) {
+    return false;  // No sobrescribir datos no leídos
   }
 
   if (size > channels[channel].dataSize || size == 0) {
@@ -194,10 +183,13 @@ void RPCManager::updateSystemData() {
 
   systemDataBuffer.isSpoolCalibrated = aligner.isSpoolCalibrated();
   systemDataBuffer.wifiEnabled = wifiEnabled;
-  systemDataBuffer.resetMeasurementsFlag = false; // Se establecerá en true cuando sea necesario
 
   systemDataBuffer.extrudedLength = getExtrudedFilamentLength();
   systemDataBuffer.extrudedWeight = getExtrudedFilamentWeight();
+
+  systemDataBuffer.measurementLastRead = measurement.lastRead;
+  systemDataBuffer.measurementMinRead = measurement.minRead;
+  systemDataBuffer.measurementMaxRead = measurement.maxRead;
 
   systemDataBuffer.pullerMinOutput = puller.minOutput;
   systemDataBuffer.pullerMaxOutput = puller.maxOutput;
@@ -213,12 +205,6 @@ void RPCManager::updateSystemData() {
 
 void RPCManager::sendSystemData() {
   sendData(CHANNEL_SYSTEM_DATA, &systemDataBuffer, sizeof(SystemStatusMessage));
-}
-
-void RPCManager::requestMeasurementReset() {
-  systemDataBuffer.resetMeasurementsFlag = true;
-  sendSystemData();
-  systemDataBuffer.resetMeasurementsFlag = false; // Resetear el flag después de enviar
 }
 #endif
 
@@ -241,17 +227,4 @@ void RPCManager::sendWebServerInfo(const WebServerMessage& config) {
   sendData(CHANNEL_WEB_SERVER, &config, sizeof(WebServerMessage));
 }
 
-void RPCManager::sendMeasurementData(float lastRead, float minRead, float maxRead) {
-  MeasurementDataMessage measurement = {};
-  measurement.lastRead = lastRead;
-  measurement.minRead = minRead;
-  measurement.maxRead = maxRead;
-  measurement.timestamp = millis();
-  
-  sendMeasurementData(measurement);
-}
-
-void RPCManager::sendMeasurementData(const MeasurementDataMessage& measurement) {
-  sendData(CHANNEL_MEASUREMENT, &measurement, sizeof(MeasurementDataMessage));
-}
 #endif

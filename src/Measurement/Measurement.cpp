@@ -1,5 +1,7 @@
 #include "Measurement/Measurement.h"
 #include "Commons/pins.h"
+#include "UI/components/general.h"
+#include "Commons/globals.h"
 
 enum class ReadState {
   IDLE,
@@ -20,9 +22,6 @@ void readBitISR() {
   lastMicros = now;
 
   if (spcState != ReadState::READING || totalBits >= 52) return;
-
-  // Verificar que los pines sean válidos antes de leer
-  if (MEASUREMENT_DATA_PIN >= NUM_DIGITAL_PINS) return;
 
   // Desplaza el buffer y añade el nuevo bit (MSB first)
   bitBuffer = (bitBuffer >> 1) | (digitalRead(MEASUREMENT_DATA_PIN) << 3);
@@ -46,9 +45,7 @@ void readBitISR() {
     bitBuffer = 0;
 
     if (totalBits == 52) {
-      if (MEASUREMENT_REQ_PIN < NUM_DIGITAL_PINS) {
-        digitalWrite(MEASUREMENT_REQ_PIN, HIGH);
-      }
+      digitalWrite(MEASUREMENT_REQ_PIN, HIGH);
       spcState = ReadState::DONE;
     }
   }
@@ -156,7 +153,14 @@ void Measurement::execute() {
     this->maxRead = this->lastRead;
   }
 
-  rpcManager.sendMeasurementData(this->lastRead, this->minRead, this->maxRead);
+  addChartValue(static_cast<int32_t>(this->lastRead * 100));
 
   spcState = ReadState::IDLE;
+}
+
+void Measurement::reset() {
+  puller.resetRevolutionCount();
+  buzzer.stop();
+
+  this->minRead = this->maxRead = this->lastRead;
 }

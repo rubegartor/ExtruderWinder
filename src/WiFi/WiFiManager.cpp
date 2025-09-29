@@ -2,7 +2,6 @@
 #include "WiFi/secrets.h"
 #include "WiFi/WebPage.h"
 #include "Commons/RPCManager.h"
-#include "Measurement/Measurement.h"
 
 IPAddress staticIP(192, 168, 1, 156);     // IP estática deseada
 IPAddress gateway(192, 168, 1, 1);        // Gateway (router)
@@ -129,15 +128,8 @@ void WiFiManager::handleSSEHandshake(WiFiClient& client) {
   if (rpcManager.hasNewSystemData()) {
     const SystemStatusMessage& data = rpcManager.getSystemData();
     
-    // Obtener datos de medición directamente de la instancia local
-    MeasurementDataMessage measurementData = {};
-    measurementData.lastRead = measurement.lastRead;
-    measurementData.minRead = measurement.minRead;
-    measurementData.maxRead = measurement.maxRead;
-    measurementData.timestamp = measurement.lastUpdateTime;
-    
     StaticJsonDocument<STATUS_JSON_CAPACITY> doc;
-    buildStatusJson(doc, data, measurementData, millis());
+    buildStatusJson(doc, data, millis());
 
     // Verificar que el JSON no exceda el buffer
     size_t jsonSize = measureJson(doc);
@@ -160,17 +152,13 @@ void WiFiManager::broadcastMeasurementSSE() {
   
   const SystemStatusMessage& data = rpcManager.getSystemData();
   
-  // Obtener datos de medición directamente de la instancia local
-  MeasurementDataMessage measurementData = {};
-  measurementData.lastRead = measurement.lastRead;
-  measurementData.minRead = measurement.minRead;
-  measurementData.maxRead = measurement.maxRead;
-  measurementData.timestamp = measurement.lastUpdateTime;
+  // Crear datos de medición desde SystemStatusMessage
+
   
   lastSseBroadcast = now;
 
   StaticJsonDocument<STATUS_JSON_CAPACITY> doc;
-  buildStatusJson(doc, data, measurementData, now);
+  buildStatusJson(doc, data, now);
 
   // Verificar tamaño del JSON antes de enviar
   size_t jsonSize = measureJson(doc);
@@ -250,11 +238,11 @@ void WiFiManager::safeRemoveClient(size_t index) {
   sseClients.erase(sseClients.begin() + index);
 }
 
-void WiFiManager::buildStatusJson(ArduinoJson::StaticJsonDocument<STATUS_JSON_CAPACITY>& doc, const SystemStatusMessage& data, const MeasurementDataMessage& measurement, unsigned long nowFallback) {
+void WiFiManager::buildStatusJson(ArduinoJson::StaticJsonDocument<STATUS_JSON_CAPACITY>& doc, const SystemStatusMessage& data, unsigned long nowFallback) {
   JsonObject meas = doc.createNestedObject("measurement");
-  meas["current"] = roundf(measurement.lastRead * 100) / 100.0f;
-  meas["min"] = roundf(measurement.minRead * 100) / 100.0f;
-  meas["max"] = roundf(measurement.maxRead * 100) / 100.0f;
+  meas["current"] = roundf(data.measurementLastRead * 100) / 100.0f;
+  meas["min"] = roundf(data.measurementMinRead * 100) / 100.0f;
+  meas["max"] = roundf(data.measurementMaxRead * 100) / 100.0f;
 
   JsonObject conf = doc.createNestedObject("configuration");
   float diameter = data.currentDiameter;

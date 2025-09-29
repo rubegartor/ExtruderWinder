@@ -42,9 +42,9 @@ void update_ui(lv_timer_t *timer) {
   lv_label_set_text_fmt(winderInfoPullerSpeedLabel, "%d", puller.speed);
   lv_label_set_text_fmt(winderInfoWeightLabel, "%.1f g", getExtrudedFilamentWeight());
 
-  lv_label_set_text_fmt(actMeasureLabel, "%.2f", measurementLastRead);
-  lv_label_set_text_fmt(minMeasureLabel, "%.2f", measurementMinRead);
-  lv_label_set_text_fmt(maxMeasureLabel, "%.2f", measurementMaxRead);
+  lv_label_set_text_fmt(actMeasureLabel, "%.2f", measurement.lastRead);
+  lv_label_set_text_fmt(minMeasureLabel, "%.2f", measurement.minRead);
+  lv_label_set_text_fmt(maxMeasureLabel, "%.2f", measurement.maxRead);
 
   if (!aligner.isHoming()) {
     lv_bar_set_value(positionBar, aligner.currentPosition(), LV_ANIM_ON);

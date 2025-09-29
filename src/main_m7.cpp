@@ -1,11 +1,9 @@
 #include "Commons/RPCManager.h"
 #include "WiFi/WiFiManager.h"
 #include <RPC.h>
-#include "Measurement/Measurement.h"
 
 RPCManager rpcManager;
-Measurement measurement(rpcManager);
-WiFiManager wifiManager(rpcManager, measurement);
+WiFiManager wifiManager(rpcManager);
 
 bool wifiInitialized = false;
 
@@ -13,9 +11,6 @@ void setup() {
   Serial.begin(115200);
   RPC.begin();
   rpcManager.begin();
-
-  measurement.setInterval(15);
-  measurement.setup();
 
   while (!rpcManager.hasNewSystemData()) {
     rpcManager.loop();
@@ -34,20 +29,11 @@ void setup() {
 
 void loop() {
   rpcManager.loop();
-  measurement.loop();
 
   // Procesar nuevos datos del sistema desde M4
   if (rpcManager.hasNewSystemData()) {
     const SystemStatusMessage& data = rpcManager.getSystemData();
     
-    // Verificar si se solicita reset de mediciones
-    if (data.resetMeasurementsFlag) {
-      measurement.minRead = measurement.maxRead = measurement.lastRead;
-      
-      // Enviar inmediatamente los valores reseteados
-      rpcManager.sendMeasurementData(measurement.lastRead, measurement.minRead, measurement.maxRead);
-    }
-
     // Gestionar el estado del WiFi según la configuración del M4
     if (data.wifiEnabled && !wifiInitialized) {
       wifiManager.begin();

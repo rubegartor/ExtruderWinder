@@ -38,11 +38,15 @@ struct SystemStatusMessage {
   // Estados del sistema
   bool isSpoolCalibrated;
   bool wifiEnabled;
-  bool resetMeasurementsFlag; // Flag para indicar reset de mediciones
 
   // Estadísticas de extrusión
   float extrudedLength;      // en metros
   float extrudedWeight;      // en gramos
+
+  // Measurements
+  float measurementLastRead; // Última lectura de medición
+  float measurementMinRead;  // Mínima lectura de medición
+  float measurementMaxRead;  // Máxima lectura de medición
 
   // Configuraciones de los motores
   int32_t pullerMinOutput;
@@ -53,17 +57,6 @@ struct SystemStatusMessage {
   int32_t alignerEndExtension;
   int32_t alignerMaxPosition;
 
-  unsigned long timestamp;
-} __attribute__((packed));
-
-/**
- * Mensaje de datos de medición que se envía desde M7 hacia M4
- * Contiene los valores de medición actuales
- */
-struct MeasurementDataMessage {
-  float lastRead;
-  float minRead;
-  float maxRead;
   unsigned long timestamp;
 } __attribute__((packed));
 
@@ -83,9 +76,8 @@ struct WebServerMessage {
  * Gestiona la comunicación bidireccional entre cores M4 y M7
  * 
  * Flujo de comunicación:
- * - M4 → M7: SystemStatusMessage (datos del sistema, sensores, motores)
+ * - M4 → M7: SystemStatusMessage (datos del sistema, sensores, motores, medición)
  * - M7 → M4: WebServerMessage (IP WiFi)
- * - M7 → M4: MeasurementDataMessage (datos de medición)
  * 
  * Uso básico:
  * 
@@ -96,10 +88,7 @@ struct WebServerMessage {
  *     auto config = rpcManager.getWebServerInfo();
  *     // Usar config.wifiIP
  *   }
- *   if (rpcManager.hasNewMeasurementData()) {
- *     auto measurement = rpcManager.getMeasurementData();
- *     // Usar measurement.lastRead, minRead, maxRead
- *   }
+
  * 
  * En Core M7:
  *   rpcManager.begin();
@@ -108,7 +97,6 @@ struct WebServerMessage {
  *     // Usar data para UI, web server, etc.
  *   }
  *   rpcManager.sendWiFiInfo(ip);  // Enviar IP WiFi
- *   rpcManager.sendMeasurementData(lastRead, minRead, maxRead);  // Enviar datos de medición
  */
 class RPCManager {
 public:
@@ -157,11 +145,6 @@ public:
    * @param enabled true para envío automático, false para envío manual
    */
   void setAutoSendSystemData(bool enabled) { autoSendSystemData = enabled; }
-  
-  /**
-   * Establece el flag para resetear las mediciones en el Core M7
-   */
-  void requestMeasurementReset();
 #endif
 
   // ===== MÉTODOS PARA CORE M7 =====
@@ -180,19 +163,7 @@ public:
    */
   void sendWebServerInfo(const WebServerMessage& config);
   
-  /**
-   * Envía datos de medición al M4
-   * @param lastRead Última lectura
-   * @param minRead Lectura mínima
-   * @param maxRead Lectura máxima
-   */
-  void sendMeasurementData(float lastRead, float minRead, float maxRead);
-  
-  /**
-   * Envía datos de medición al M4
-   * @param measurement Estructura con los datos de medición
-   */
-  void sendMeasurementData(const MeasurementDataMessage& measurement);
+
 #endif
 
   // ===== MÉTODOS COMUNES PARA AMBOS CORES =====
@@ -233,31 +204,14 @@ public:
    */
   void markWebServerInfoProcessed() { newWebServerInfoAvailable = false; }
   
-  /**
-   * Verifica si hay nuevos datos de medición disponibles (desde M7)
-   * @return true si hay datos nuevos sin procesar
-   */
-  bool hasNewMeasurementData() const { return newMeasurementDataAvailable; }
-  
-  /**
-   * Obtiene los datos de medición más recientes
-   * @return Referencia constante a los datos de medición
-   */
-  const MeasurementDataMessage& getMeasurementData() const { return measurementDataBuffer; }
-  
-  /**
-   * Marca los datos de medición como procesados
-   * Debe llamarse después de procesar los datos de medición
-   */
-  void markMeasurementDataProcessed() { newMeasurementDataAvailable = false; }
+
 
 private:
   // Enumeración para tipos de canal
   enum ChannelType {
     CHANNEL_SYSTEM_DATA = 0,    // M4 → M7
     CHANNEL_WEB_SERVER = 1,     // M7 → M4
-    CHANNEL_MEASUREMENT = 2,    // M7 → M4
-    CHANNEL_COUNT = 3
+    CHANNEL_COUNT = 2
   };
 
   // Estructura para sincronización en memoria compartida
@@ -276,12 +230,10 @@ private:
   // Buffers para los mensajes
   SystemStatusMessage systemDataBuffer;
   WebServerMessage webServerBuffer;
-  MeasurementDataMessage measurementDataBuffer;
   
   // Flags para datos nuevos
   bool newSystemDataAvailable;
   bool newWebServerInfoAvailable;
-  bool newMeasurementDataAvailable;
 
 #ifdef CORE_M4
   // Variables para el envío automático desde M4

@@ -9,6 +9,7 @@
 #include "Commons/Storage.h"
 #include "Buzzer/Buzzer.h"
 #include "Commons/RPCManager.h"
+#include "Measurement/Measurement.h"
 
 #define DIAMETER_PREF "diameter"
 #define DIAMETER_DEFAULT 1.75f
@@ -29,6 +30,7 @@ extern Tensioner tensioner;
 extern Puller puller;
 extern Aligner aligner;
 extern Spooler spooler;
+extern Measurement measurement;
 
 extern Storage storage;
 extern RPCManager rpcManager;
@@ -41,11 +43,6 @@ extern int weightAlertThreshold;
 extern bool wifiEnabled;
 
 extern int32_t aligner_to_move;
-
-// Variables de medición recibidas desde M7
-extern float measurementLastRead;
-extern float measurementMinRead;
-extern float measurementMaxRead;
 
 struct PlasticType {
   String name;
@@ -66,8 +63,6 @@ void updateFilamentAlertThreshold(float value);
 void updateWifiEnabled(bool value);
 
 void updatePlasticType(uint8_t index);
-
-void resetMeasurements();
 
 float getExtrudedFilamentLength();
 float getExtrudedFilamentWeight();

@@ -98,7 +98,7 @@ void Puller::setupPID() {
 }
 
 void Puller::execute() {
-  this->input = measurementLastRead;
+  this->input = measurement.lastRead;
 
   double gap = abs(this->setPoint - this->input);
 

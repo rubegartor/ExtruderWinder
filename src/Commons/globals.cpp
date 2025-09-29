@@ -6,6 +6,7 @@ Tensioner tensioner;
 Puller puller;
 Aligner aligner;
 Spooler spooler;
+Measurement measurement(rpcManager);
 
 Storage storage;
 RPCManager rpcManager;
@@ -18,11 +19,6 @@ int weightAlertThreshold = WEIGHT_ALERT_DEFAULT;
 bool wifiEnabled = WIFI_ENABLED_DEFAULT;
 
 int32_t aligner_to_move = static_cast<int32_t>(STEPS_PER_CM * (diameter / 10.0f));
-
-// Variables de medición recibidas desde M7
-float measurementLastRead = 0.0f;
-float measurementMinRead = 0.0f;
-float measurementMaxRead = 0.0f;
 
 std::vector<PlasticType> plasticTypes = {
   {"PLA", 1.24f},
@@ -63,10 +59,6 @@ void initGlobals() {
   wifiEnabled = storage.getBool(WIFI_ENABLED_PREF, WIFI_ENABLED_DEFAULT);
 
   aligner_to_move = static_cast<int32_t>(STEPS_PER_CM * (diameter / 10.0f));
-  
-  measurementLastRead = 0.00f;
-  measurementMinRead = 0.00f;
-  measurementMaxRead = 0.00f;
 }
 
 void updateDiameter(float value) {
@@ -131,17 +123,4 @@ float getExtrudedFilamentWeight() {
   }
 
   return weight;
-}
-
-void resetMeasurements() {
-  puller.resetRevolutionCount();
-  buzzer.stop();
-
-  // Resetear las variables locales de medición
-  measurementLastRead = 0.0f;
-  measurementMinRead = 0.0f;
-  measurementMaxRead = 0.0f;
-
-  // Enviar comando de reset al Core M7 a través del RPC
-  rpcManager.requestMeasurementReset();
 }
