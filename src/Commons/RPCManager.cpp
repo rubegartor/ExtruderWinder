@@ -211,11 +211,20 @@ void RPCManager::sendSystemData() {
 // ===== MÉTODOS PARA CORE M7 =====
 #ifdef CORE_M7
 void RPCManager::sendWiFiInfo(const char* ip) {
+  sendWiFiInfo(ip, "");
+}
+
+void RPCManager::sendWiFiInfo(const char* ip, const char* ssid) {
   WebServerMessage config = {};
 
   if (ip != nullptr) {
     strncpy(config.wifiIP, ip, sizeof(config.wifiIP) - 1);
     config.wifiIP[sizeof(config.wifiIP) - 1] = '\0';
+  }
+  
+  if (ssid != nullptr) {
+    strncpy(config.wifiSSID, ssid, sizeof(config.wifiSSID) - 1);
+    config.wifiSSID[sizeof(config.wifiSSID) - 1] = '\0';
   }
   
   config.timestamp = millis();

@@ -74,7 +74,9 @@ void Aligner::setup() {
   motor.driver.enable();
 
   motor.controller.beginRampToZeroVelocity();
+#ifndef WITHOUT_MOTOR_CONTROL
   while (!motor.controller.zeroVelocity());
+#endif
   motor.controller.endRampToZeroVelocity();
   motor.controller.zeroActualPosition();
   motor.controller.enableStallStop();

@@ -70,7 +70,7 @@ void update_ui(lv_timer_t *timer) {
     if (rpcManager.hasNewWebServerInfo()) {
       const WebServerMessage& config = rpcManager.getWebServerInfo();
       if (strlen(config.wifiIP) > 0) {
-        lv_label_set_text_fmt(wifiIPLabel, "WiFi: %s", config.wifiIP);
+        lv_label_set_text_fmt(wifiIPLabel, "WiFi [%s]: %s", config.wifiSSID, config.wifiIP);
       } else {
         lv_label_set_text(wifiIPLabel, "WiFi: Desconectado");
       }

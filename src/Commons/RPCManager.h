@@ -67,6 +67,7 @@ struct SystemStatusMessage {
 struct WebServerMessage {
   // Información del WiFi
   char wifiIP[16];           // IP del servidor web (formato "192.168.1.100")
+  char wifiSSID[32];         // SSID de la red WiFi conectada
   
   // Timestamp para validar la frescura del mensaje
   unsigned long timestamp;
@@ -156,6 +157,13 @@ public:
    * @param ip Dirección IP del servidor web (ej: "192.168.1.100")
    */
   void sendWiFiInfo(const char* ip);
+  
+  /**
+   * Envía configuración WiFi completa al M4
+   * @param ip Dirección IP del servidor web (ej: "192.168.1.100")
+   * @param ssid SSID de la red WiFi conectada
+   */
+  void sendWiFiInfo(const char* ip, const char* ssid);
   
   /**
    * Envía información del servidor web al M4

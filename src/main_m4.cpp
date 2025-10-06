@@ -7,7 +7,7 @@
 #include "UI/components/settingsTab.h"
 #include "UI/components/popupTab.h"
 
-void setup() {  
+void setup() {
   initGlobals();
 
   aligner.setInterval(80);
@@ -16,11 +16,9 @@ void setup() {
   tensioner.setInterval(100);
   measurement.setInterval(15);
 
-#ifndef WITHOUT_MOTOR_CONTROL
   puller.setup();
   aligner.setup();
   spooler.setup();
-#endif
   tensioner.setup();
   measurement.setup();
 
@@ -39,8 +37,10 @@ void loop() {
   rpcManager.loop();
   measurement.loop();
 
+#ifndef WITHOUT_MOTOR_CONTROL
   aligner.loop();
   puller.loop();
   spooler.loop();
+#endif
   tensioner.loop();
 }
