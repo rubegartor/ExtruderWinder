@@ -94,12 +94,26 @@ void Measurement::setup() {
 
 void Measurement::execute() {
   if (spcState == ReadState::IDLE) {
+    // Sección crítica: deshabilitar la ISR mientras se resetean los buffers
+    // compartidos para evitar que una interrupción entrante los corrompa.
+    noInterrupts();
     totalBits = 0;
     bitBuffer = 0;
     memset((void*)spcdata, 0, sizeof(spcdata));
     memset((void*)fullSPCData, 0, sizeof(fullSPCData));
     spcState = ReadState::READING;
+    interrupts();
+
+    readingStartTime = millis();
     digitalWrite(MEASUREMENT_REQ_PIN, LOW);
+  }
+
+  // Timeout de seguridad: si llevamos más de 300 ms en READING sin completar
+  // (cable desconectado, pulso CLK perdido), resetear para no bloquear el sistema.
+  if (spcState == ReadState::READING && (millis() - readingStartTime > 300)) {
+    digitalWrite(MEASUREMENT_REQ_PIN, HIGH);
+    spcState = ReadState::IDLE;
+    return;
   }
 
   if (spcState != ReadState::DONE) return;
@@ -150,10 +164,16 @@ void Measurement::execute() {
   this->rejectedReadCount = 0;     // Resetear el contador de rechazos
   this->lastUpdateTime = millis();
 
-  if (this->lastRead < this->minRead) {
-    this->minRead = this->lastRead;
-  } else if (this->lastRead > this->maxRead) {
-    this->maxRead = this->lastRead;
+  // Si no hay lectura previa, inicializar min y max con el primer valor real
+  // (ambos en 0 es el estado "sin datos": el min siempre sería 0 si no se corrige).
+  if (this->minRead == 0.0f && this->maxRead == 0.0f) {
+    this->minRead = this->maxRead = value;
+  } else {
+    if (this->lastRead < this->minRead) {
+      this->minRead = this->lastRead;
+    } else if (this->lastRead > this->maxRead) {
+      this->maxRead = this->lastRead;
+    }
   }
 
   rpcManager.sendMeasurementData(this->lastRead, this->minRead, this->maxRead);

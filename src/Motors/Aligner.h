@@ -7,6 +7,10 @@
 #define MAX_ALIGNER_POSITION (STEPS_PER_CM * 13)
 #define MANUAL_MOVE_DELAY 25
 
+// Número de fallos consecutivos de lectura SPI antes de considerar el driver deshabilitado.
+// Evita reinicializaciones en producción por glitches puntuales de ruido en el bus.
+#define ENABLED_FAIL_THRESHOLD 3
+
 enum AlignerDirection {
   FORWARD,
   BACKWARD
@@ -41,6 +45,7 @@ private:
 
   bool homingAfterError = false;
   int32_t lastKnownPosition = 0;
+  uint8_t disabledCount = 0;
 
   // Variables para el estado de calibración del spool
   bool startPositionSet = false;

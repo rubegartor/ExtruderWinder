@@ -76,7 +76,8 @@ void Puller::setupDriver() {
   motor.driver.enable();
 
   motor.controller.beginRampToZeroVelocity();
-  while (!motor.controller.zeroVelocity());
+  unsigned long zeroVelTimeout = millis() + 5000;
+  while (!motor.controller.zeroVelocity() && millis() < zeroVelTimeout);
   motor.controller.endRampToZeroVelocity();
   motor.controller.zeroActualPosition();
 
@@ -115,7 +116,18 @@ void Puller::execute() {
   motor.controller.writeMaxVelocity(motor.converter.velocityRealToChip(this->speed));
 
   int32_t currentPosition = motor.controller.readActualPosition();
-  int32_t completedRevolutions = (currentPosition - lastPosition) / PULLER_ONE_REV_STEPS;
+  int32_t positionDelta = currentPosition - lastPosition;
+
+  // Comprobación de cordura: a 8000 RPM y 80 ms de intervalo, el máximo
+  // avance posible es ~546 000 pasos. Si el delta es negativo o absurdamente
+  // grande, la lectura SPI está corrompida; actualizar lastPosition y descartar.
+  const int32_t MAX_POSITION_DELTA = 1100000;
+  if (positionDelta < 0 || positionDelta > MAX_POSITION_DELTA) {
+    lastPosition = currentPosition;
+    return;
+  }
+
+  int32_t completedRevolutions = positionDelta / PULLER_ONE_REV_STEPS;
   
   if (completedRevolutions >= 1) {
     revolutionCount += completedRevolutions;

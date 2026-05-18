@@ -73,7 +73,8 @@ void Spooler::setupDriver() {
   motor.driver.enable();
 
   motor.controller.beginRampToZeroVelocity();
-  while (!motor.controller.zeroVelocity());
+  unsigned long zeroVelTimeout = millis() + 5000;
+  while (!motor.controller.zeroVelocity() && millis() < zeroVelTimeout);
   motor.controller.endRampToZeroVelocity();
   motor.controller.zeroActualPosition();
   
@@ -133,6 +134,14 @@ void Spooler::execute() {
 
   int32_t currentPosition = motor.converter.positionChipToReal(motor.controller.readActualPosition());
   int32_t completedRevolutions = currentPosition - lastPosition;
+
+  // Comprobación de cordura: en el intervalo de ejecución (100 ms) a
+  // SPOOLER_MAX_SPEED RPM el máximo posible es ~1 revolución. Si es mayor,
+  // la lectura SPI está corrompida; actualizar lastPosition y descartar.
+  if (completedRevolutions < 0 || completedRevolutions > 5) {
+    lastPosition = currentPosition;
+    return;
+  }
   
   if (completedRevolutions >= 1) {
     revolutionCount += completedRevolutions;
@@ -145,12 +154,19 @@ void Spooler::execute() {
 }
 
 void Spooler::reinit() {
-  SPI1.end();
-  delay(10);
-  SPI1.begin();
-
-  delay(10);
+  // No llamar a SPI1.end()/begin(): mataría la comunicación del Puller y Aligner también.
+  // Solo reinicializar este driver TMC manteniendo el bus SPI activo.
   motor.reinitialize();
+  delay(10);
+
+  tmc51x0::DriverParameters driver_parameters_chip = motor.converter.driverParametersRealToChip(driver_parameters_real);
+  motor.driver.setup(driver_parameters_chip);
+
+  tmc51x0::ControllerParameters controller_parameters_chip = motor.converter.controllerParametersRealToChip(controller_parameters_real);
+  motor.controller.setup(controller_parameters_chip);
+
+  motor.driver.enable();
+  disabledCount = 0;
 }
 
 bool Spooler::enabled() {
@@ -159,5 +175,13 @@ bool Spooler::enabled() {
   tmc51x0::Registers::Chopconf chopConf;
   chopConf.bytes = motor.registers.read(Registers::ChopconfAddress);
 
-  return chopConf.toff != 0;
+  if (chopConf.toff != 0) {
+    disabledCount = 0;
+    return true;
+  }
+
+  // Requerir fallos consecutivos antes de considerar el driver deshabilitado.
+  // Un solo fallo SPI por ruido no debe lanzar un reinit en producción.
+  disabledCount++;
+  return disabledCount < SPOOLER_ENABLED_FAIL_THRESHOLD;
 }

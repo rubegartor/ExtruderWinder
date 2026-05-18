@@ -131,9 +131,16 @@ bool RPCManager::sendData(ChannelType channel, const void* data, size_t size) {
     dest[i] = src[i];
   }
   
-  __sync_synchronize();
+  // DMB sy (full-system): garantiza que todos los accesos anteriores a memoria
+  // son visibles antes de escribir el flag. Necesario en Cortex-M7 dual-core;
+  // __sync_synchronize() genera "dmb ish" (inner-shareable) que en STM32H747
+  // no cubre el dominio completo del bus AXI entre M4 y M7.
+  __DMB();
   channels[channel].control->messageSize = size;
   channels[channel].control->dataReady = true;
+  // Segunda barrera para garantizar que el flag es visible al receptor
+  // antes de que este core continúe con cualquier otra operación.
+  __DMB();
   
   return true;
 }
@@ -152,8 +159,13 @@ bool RPCManager::receiveData(ChannelType channel, void* buffer, size_t bufferSiz
     return false;  // No hay datos nuevos
   }
 
+  // Barrera antes de leer: garantiza que vemos los datos escritos por el otro
+  // core antes de que pusiera dataReady = true.
+  __DMB();
+
   uint32_t messageSize = channels[channel].control->messageSize;
   if (messageSize > bufferSize || messageSize == 0) {
+    channels[channel].control->dataReady = false;
     return false;  // Buffer demasiado pequeño o mensaje inválido
   }
 
@@ -165,8 +177,12 @@ bool RPCManager::receiveData(ChannelType channel, void* buffer, size_t bufferSiz
     dest[i] = src[i];
   }
   
+  // Barrera antes de limpiar el flag: garantiza que la copia de datos ha
+  // completado antes de señalizar disponibilidad al emisor.
+  __DMB();
   channels[channel].control->dataReady = false;
-  __sync_synchronize();
+  // Barrera final: el emisor verá el flag limpio antes de seguir.
+  __DMB();
   
   return true;
 }

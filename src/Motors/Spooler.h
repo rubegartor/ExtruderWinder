@@ -4,9 +4,12 @@
 #include "Commons/TimedComponent.h"
 #include <QuickPID.h>
 
-#define SPOOLER_MAX_SPEED 65
+#define SPOOLER_MAX_SPEED 15 //TODO: Restore to 65
 #define MIN_PID_SPOOLER_OUTPUT_LIMIT 0
 #define MAX_PID_SPOOLER_OUTPUT_LIMIT 255
+
+// Número de fallos consecutivos de lectura SPI antes de considerar el driver deshabilitado.
+#define SPOOLER_ENABLED_FAIL_THRESHOLD 3
 
 class Spooler : public TimedComponent {
 private:
@@ -16,6 +19,7 @@ private:
   int32_t lastPosition;
   int32_t revolutionCount;
   bool thresholdReached;
+  uint8_t disabledCount = 0;
 
   float setPoint, input, output;
   float Kp = 0.8, Ki = 0.5, Kd = 0.1;

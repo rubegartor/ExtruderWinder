@@ -20,6 +20,7 @@ class Measurement : public TimedComponent {
     unsigned long lastUpdateTime = 0;
     float previousValidRead = 0.00f;  // Almacena la última lectura válida para comparación
     uint8_t rejectedReadCount = 0;    // Contador de lecturas rechazadas consecutivas
+    unsigned long readingStartTime = 0; // Para timeout del estado READING
 
     void setup();
     void execute() override;

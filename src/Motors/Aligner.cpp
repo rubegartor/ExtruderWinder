@@ -156,6 +156,7 @@ void Aligner::handleSpoolCalibration() {
   } else {
     if (startPositionSet && endPositionSet && motor.controller.positionReached()) {
       currentState = AlignerState::AUTO_MOVE;
+      motor.controller.disableStallStop();
     }
   }
 }
@@ -334,14 +335,15 @@ int32_t Aligner::getEffectiveEndPos() {
 }
 
 void Aligner::reinit() {
-  SPI1.end();
-  delay(10);
-  SPI1.begin();
-
-  delay(10);
+  // No llamar a SPI1.end()/begin(): mataría la comunicación del Puller y Spooler también.
+  // Solo reinicializar este driver TMC manteniendo el bus SPI activo.
   motor.reinitialize();
   delay(10);
 
+  applyParameters(AlignerParameterMode::NORMAL_OPERATION);
+  motor.driver.enable();
+
+  disabledCount = 0;
   resetHome(true);
 }
 
@@ -351,5 +353,13 @@ bool Aligner::enabled() {
   tmc51x0::Registers::Chopconf chopConf;
   chopConf.bytes = motor.registers.read(Registers::ChopconfAddress);
 
-  return chopConf.toff != 0;
+  if (chopConf.toff != 0) {
+    disabledCount = 0;
+    return true;
+  }
+
+  // Requerir fallos consecutivos antes de considerar el driver deshabilitado.
+  // Un solo fallo SPI por ruido no debe lanzar un reinit completo en producción.
+  disabledCount++;
+  return disabledCount < ENABLED_FAIL_THRESHOLD;
 }
