@@ -4,69 +4,51 @@
 #include "UI/components/general.h"
 #include "Stepper.h"
 
-const tmc51x0::SpiParameters spi_parameters = {
-  .spi_ptr = &SPI_INTERFACE,
-  .clock_rate = TMC5160_SPI_FREQ,
-  .chip_select_pin = ALIGNER_CS_PIN
-};
+const auto spi_parameters = tmc51x0::SpiParameters{}
+  .withSpi(&SPI_INTERFACE)
+  .withChipSelectPin(ALIGNER_CS_PIN)
+  .withClockRate(TMC5160_SPI_FREQ);
 
-const tmc51x0::ConverterParameters converter_parameters = {
-  .clock_frequency_mhz = 12,
-  .microsteps_per_real_position_unit = 6400
-};
+const auto converter_parameters = tmc51x0::ConverterParameters{}
+  .withClockFrequencyMHz(12)
+  .withMicrostepsPerRealPositionUnit(6400)
+  .withSecondsPerRealVelocityUnit(1);
 
 tmc51x0::DriverParameters getDriverParameters(AlignerParameterMode mode) {
   bool isCalibration = (mode == AlignerParameterMode::CALIBRATION);
-  return {
-    .global_current_scaler = 48,
-    .run_current = isCalibration ? static_cast<uint8_t>(7) : static_cast<uint8_t>(20),
-    .hold_current = isCalibration ? static_cast<uint8_t>(15) : static_cast<uint8_t>(25),
-    .hold_delay = 2,
-    .pwm_offset = 30,
-    .pwm_gradient = 15,
-    .automatic_current_control_enabled = false,
-    .motor_direction = tmc51x0::ReverseDirection,
-    .standstill_mode = tmc51x0::NormalMode,
-    .chopper_mode = tmc51x0::SpreadCycleMode,
-    .stealth_chop_threshold = 1,
-    .stealth_chop_enabled = true,
-    .cool_step_threshold = 1,
-    .cool_step_min = 1,
-    .cool_step_max = 0,
-    .cool_step_enabled = false,
-    .high_velocity_threshold = 10000,
-    .high_velocity_fullstep_enabled = false,
-    .high_velocity_chopper_switch_enabled = false,
-    .stall_guard_threshold = static_cast<int8_t>(isCalibration ? 2 : 5),
-    .stall_guard_filter_enabled = false,
-    .short_to_ground_protection_enabled = true,
-    .enabled_toff = 3,
-    .comparator_blank_time = tmc51x0::ClockCycles36,
-    .dc_time = 37,
-    .dc_stall_guard_threshold = static_cast<uint8_t>(isCalibration ? 2 : 5)
-  };
+  return tmc51x0::DriverParameters{}
+    .withGlobalCurrentScaler(48)
+    .withRunCurrent(isCalibration ? static_cast<uint8_t>(7) : static_cast<uint8_t>(20))
+    .withHoldCurrent(isCalibration ? static_cast<uint8_t>(15) : static_cast<uint8_t>(25))
+    .withHoldDelay(2)
+    .withPwmOffset(30)
+    .withPwmGradient(15)
+    .withMotorDirection(tmc51x0::ReverseDirection)
+    .withStealthChopThreshold(1u)
+    .withCoolStepThreshold(1u)
+    .withHighVelocityThreshold(10000u)
+    .withStallGuardThreshold(static_cast<int8_t>(isCalibration ? 2 : 5))
+    .withDcTime(static_cast<uint16_t>(37))
+    .withDcStallGuardThreshold(static_cast<uint8_t>(isCalibration ? 2 : 5));
 }
 
 tmc51x0::ControllerParameters getControllerParameters(AlignerParameterMode mode) {
   bool isCalibration = (mode == AlignerParameterMode::CALIBRATION);
-  return {
-    .ramp_mode = tmc51x0::PositionMode,
-    .stop_mode = tmc51x0::HardMode,
-    .max_velocity = static_cast<uint32_t>(isCalibration ? 25 : 50),
-    .max_acceleration = 300,
-    .start_velocity = 180,
-    .stop_velocity = 180,
-    .first_velocity = 180,
-    .first_acceleration = 300,
-    .max_deceleration = 500,
-    .first_deceleration = 500,
-    .zero_wait_duration = 0,
-    .stall_stop_enabled = true
-  };
+  return tmc51x0::ControllerParameters{}
+    .withRampMode(tmc51x0::PositionMode)
+    .withMaxVelocity(static_cast<uint32_t>(isCalibration ? 25 : 50))
+    .withMaxAcceleration(300u)
+    .withStartVelocity(180u)
+    .withStopVelocity(180u)
+    .withFirstVelocity(180u)
+    .withFirstAcceleration(300u)
+    .withMaxDeceleration(500u)
+    .withFirstDeceleration(500u)
+    .withStallStopEnabled(true);
 }
 
 void Aligner::setup() {
-  motor.setupSpi(spi_parameters);
+  motor.setupSpi(spi_parameters, tmc51x0::Registers::DeviceModel::TMC5160A);
   motor.converter.setup(converter_parameters);
 
   applyParameters(AlignerParameterMode::NORMAL_OPERATION);
@@ -81,6 +63,22 @@ void Aligner::setup() {
 }
 
 void Aligner::execute() {
+  tmc51x0::HealthStatus health = motor.readHealthStatus();
+
+  if (health.reset || health.mirror_resync_required) {
+    // El chip se reinició: XACTUAL vuelve a 0, la referencia espacial se pierde.
+    // reinit() restaura la configuración del driver y lanza re-homing automático,
+    // preservando la calibración del spool (startPos/endPos).
+    reinit();
+    return;
+  }
+
+  if (!health.communication_ok || health.driver_error || health.charge_pump_undervoltage) {
+    // Otro error de hardware sin reset de posición: restaurar solo la configuración.
+    motor.notePossibleMirrorDrift();
+    motor.recoverIfNeeded();
+  }
+
   handleStateMachine();
 
   if (!this->enabled()) {
@@ -150,10 +148,14 @@ void Aligner::handleSpoolCalibration() {
     
     if (!startPositionSet) {
       setStartPosition();
+      waitFor(500, AlignerState::SPOOL_CALIBRATION);
     } else if (!endPositionSet) {
       setEndPosition();
     }
   } else {
+    if (startPositionSet && !endPositionSet) {
+      motor.controller.enableStallStop();
+    }
     if (startPositionSet && endPositionSet && motor.controller.positionReached()) {
       currentState = AlignerState::AUTO_MOVE;
       motor.controller.disableStallStop();
@@ -273,7 +275,6 @@ void Aligner::setStartPosition() {
   startPositionSet = true;
 
   motor.controller.writeTargetPosition(MAX_ALIGNER_POSITION * 2);
-  motor.controller.enableStallStop(); 
 }
 
 void Aligner::setEndPosition() {
@@ -332,7 +333,7 @@ int32_t Aligner::getEffectiveEndPos() {
   int32_t s = startPos - startExtension;
   int32_t e = endPos + endExtension;
   return (e >= s) ? e : s; // evitar invertir límites
-}
+} 
 
 void Aligner::reinit() {
   // No llamar a SPI1.end()/begin(): mataría la comunicación del Puller y Spooler también.
@@ -351,9 +352,9 @@ bool Aligner::enabled() {
   using namespace tmc51x0;
 
   tmc51x0::Registers::Chopconf chopConf;
-  chopConf.bytes = motor.registers.read(Registers::ChopconfAddress);
+  chopConf.raw = motor.registers.read(Registers::ChopconfAddress);
 
-  if (chopConf.toff != 0) {
+  if (chopConf.toff() != 0) {
     disabledCount = 0;
     return true;
   }

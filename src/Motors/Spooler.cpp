@@ -3,57 +3,49 @@
 #include "Commons/globals.h"
 #include "Stepper.h"
 
-const tmc51x0::SpiParameters spi_parameters =
-{
-  .spi_ptr = &SPI_INTERFACE,
-  .clock_rate = TMC5160_SPI_FREQ,
-  .chip_select_pin = SPOOLER_CS_PIN
-};
+const auto spi_parameters = tmc51x0::SpiParameters{}
+  .withSpi(&SPI_INTERFACE)
+  .withChipSelectPin(SPOOLER_CS_PIN)
+  .withClockRate(TMC5160_SPI_FREQ);
 
-const tmc51x0::ConverterParameters converter_parameters =
-{
-  .clock_frequency_mhz = 12,
-  .microsteps_per_real_position_unit = 256000,  // 51200 * 5 (reducción 1:5)
-  .seconds_per_real_velocity_unit = 60
-};
+const auto converter_parameters = tmc51x0::ConverterParameters{}
+  .withClockFrequencyMHz(12)
+  .withMicrostepsPerRealPositionUnit(256000) // (51200 * 5, reducción 1:5)
+  .withSecondsPerRealVelocityUnit(60);
 
-const tmc51x0::DriverParameters driver_parameters_real =
-{
-  .global_current_scaler = 100,
-  .run_current = 85,
-  .hold_current = 25,
-  .hold_delay = 5,
-  .pwm_offset = 30,
-  .pwm_gradient = 10,
-  .automatic_current_control_enabled = false,
-  .motor_direction = tmc51x0::ForwardDirection,
-  .standstill_mode = tmc51x0::NormalMode,
-  .chopper_mode = tmc51x0::SpreadCycleMode,
-  .stealth_chop_threshold = 0,
-  .stealth_chop_enabled = false,
-  .cool_step_threshold = 1000,
-  .cool_step_min = 1,
-  .cool_step_max = 0,
-  .cool_step_enabled = false,
-  .high_velocity_threshold = 0,
-  .high_velocity_fullstep_enabled = false,
-  .high_velocity_chopper_switch_enabled = false,
-  .stall_guard_threshold = 0,
-  .stall_guard_filter_enabled = false,
-  .short_to_ground_protection_enabled = true,
-  .enabled_toff = 5,
-  .comparator_blank_time = tmc51x0::ClockCycles36,
-  .dc_time = 0,
-  .dc_stall_guard_threshold = 0,
-};
+const auto driver_parameters_real = tmc51x0::DriverParameters{}
+  .withGlobalCurrentScaler(100)
+  .withRunCurrent(85)
+  .withHoldCurrent(25)
+  .withHoldDelay(5)
+  .withPwmOffset(30)
+  .withPwmGradient(10)
+  .withAutomaticCurrentControlEnabled(false)
+  .withMotorDirection(tmc51x0::ForwardDirection)
+  .withStandstillMode(tmc51x0::NormalMode)
+  .withChopperMode(tmc51x0::SpreadCycleMode)
+  .withStealthChopThreshold(0u)
+  .withStealthChopEnabled(false)
+  .withCoolStepThreshold(1000u)
+  .withCoolStepMin(1)
+  .withCoolStepMax(0)
+  .withCoolStepEnabled(false)
+  .withHighVelocityThreshold(0u)
+  .withHighVelocityFullstepEnabled(false)
+  .withHighVelocityChopperSwitchEnabled(false)
+  .withStallGuardThreshold(static_cast<int8_t>(0))
+  .withStallGuardFilterEnabled(false)
+  .withShortToGroundProtectionEnabled(true)
+  .withEnabledToff(5)
+  .withComparatorBlankTime(tmc51x0::ClockCycles36)
+  .withDcTime(static_cast<uint16_t>(0))
+  .withDcStallGuardThreshold(static_cast<uint8_t>(0));
 
-const tmc51x0::ControllerParameters controller_parameters_real =
-{
-  .ramp_mode = tmc51x0::VelocityPositiveMode,
-  .stop_mode = tmc51x0::HardMode,
-  .max_velocity = 0,
-  .max_acceleration = 10
-};
+const auto controller_parameters_real = tmc51x0::ControllerParameters{}
+  .withRampMode(tmc51x0::VelocityPositiveMode)
+  .withStopMode(tmc51x0::HardMode)
+  .withMaxVelocity(0u)
+  .withMaxAcceleration(10u);
 
 void Spooler::setup() {
   setupPID();
@@ -61,7 +53,7 @@ void Spooler::setup() {
 }
 
 void Spooler::setupDriver() {
-  motor.setupSpi(spi_parameters);
+  motor.setupSpi(spi_parameters, tmc51x0::Registers::DeviceModel::TMC5160A);
   motor.converter.setup(converter_parameters);
 
   tmc51x0::DriverParameters driver_parameters_chip = motor.converter.driverParametersRealToChip(driver_parameters_real);
@@ -95,6 +87,8 @@ void Spooler::setupPID() {
 }
 
 void Spooler::execute() {
+  motor.recoverIfUnhealthy();
+
   if (!this->enabled()) {
     this->reinit();
   }
@@ -173,9 +167,9 @@ bool Spooler::enabled() {
   using namespace tmc51x0;
 
   tmc51x0::Registers::Chopconf chopConf;
-  chopConf.bytes = motor.registers.read(Registers::ChopconfAddress);
+  chopConf.raw = motor.registers.read(Registers::ChopconfAddress);
 
-  if (chopConf.toff != 0) {
+  if (chopConf.toff() != 0) {
     disabledCount = 0;
     return true;
   }

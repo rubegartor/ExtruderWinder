@@ -4,7 +4,7 @@
 #include "Commons/TimedComponent.h"
 #include <QuickPID.h>
 
-#define SPOOLER_MAX_SPEED 15 //TODO: Restore to 65
+#define SPOOLER_MAX_SPEED 65
 #define MIN_PID_SPOOLER_OUTPUT_LIMIT 0
 #define MAX_PID_SPOOLER_OUTPUT_LIMIT 255
 
