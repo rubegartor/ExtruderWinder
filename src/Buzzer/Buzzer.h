@@ -12,16 +12,14 @@ enum BuzzerBeep {
 };
 
 class Buzzer {
-  private:
-    mbed::PwmOut* pwm;
-    bool isActive;
+  public:
+    static Buzzer& getInstance() {
+      static Buzzer instance;
+      return instance;
+    }
 
-public:
-  Buzzer() {
-    pwm = new mbed::PwmOut(digitalPinToPinName(BUZZER_PIN));
-
-    this->stop();
-  }
+    Buzzer(const Buzzer&)            = delete;
+    Buzzer& operator=(const Buzzer&) = delete;
 
   void beep(BuzzerBeep speed) {
     if (!isActive) {
@@ -36,4 +34,13 @@ public:
     pwm->write(0.0f);
     isActive = false;
   }
+
+  private:
+    mbed::PwmOut* pwm;
+    bool isActive;
+
+    Buzzer() {
+      pwm = new mbed::PwmOut(digitalPinToPinName(BUZZER_PIN));
+      this->stop();
+    }
 };

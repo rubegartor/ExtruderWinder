@@ -1,67 +1,54 @@
-#include "Commons/RPCManager.h"
-#include "WiFi/WiFiManager.h"
-#include <RPC.h>
-#include "Measurement/Measurement.h"
+#include "Commons/globals.h"
+#include "Commons/pins.h"
+#include <rtos.h>
 
-RPCManager rpcManager;
-Measurement measurement(rpcManager);
-WiFiManager wifiManager(rpcManager, measurement);
+#include "UI/components/general.h"
+#include "UI/components/sidebar.h"
+#include "UI/components/homeTab.h"
+#include "UI/components/controlTab.h"
+#include "UI/components/settingsTab.h"
+#include "UI/components/popupTab.h"
 
-bool wifiInitialized = false;
+static rtos::Thread* motorThread = nullptr;
+
+static void motorTask() {
+  while (true) {
+    aligner.loop();
+    puller.loop();
+    spooler.loop();
+    tensioner.loop();
+  }
+}
 
 void setup() {
-  Serial.begin(115200);
-  RPC.begin();
-  rpcManager.begin();
+  initGlobals();
 
+  aligner.setInterval(80);
+  puller.setInterval(80);
+  spooler.setInterval(100);
+  tensioner.setInterval(100);
   measurement.setInterval(15);
+
+  puller.setup();
+  aligner.setup();
+  spooler.setup();
+  tensioner.setup();
   measurement.setup();
 
-  while (!rpcManager.hasNewSystemData()) {
-    rpcManager.loop();
-    delay(10);
-  }
+  build_sidebar();
+  build_homeTab(tab1);
+  build_controlTab(tab2);
+  build_settingsTab(tab3);
+  build_popupTab(tab4);
 
-  const SystemStatusMessage& data = rpcManager.getSystemData();
-  
-  if (data.wifiEnabled) {
-    wifiManager.begin();
-    wifiInitialized = true;
-  }
-  
-  rpcManager.markSystemDataProcessed();
+  motorThread = new rtos::Thread(osPriorityNormal, 8192);
+  motorThread->start(motorTask);
+
+  setupUITimer();
 }
 
 void loop() {
-  rpcManager.loop();
+  lv_timer_handler_run_in_period(5);
   measurement.loop();
-
-  // Procesar nuevos datos del sistema desde M4
-  if (rpcManager.hasNewSystemData()) {
-    const SystemStatusMessage& data = rpcManager.getSystemData();
-    
-    // Verificar si se solicita reset de mediciones
-    if (data.resetMeasurementsFlag) {
-      measurement.minRead = measurement.maxRead = measurement.lastRead;
-      
-      // Enviar inmediatamente los valores reseteados
-      rpcManager.sendMeasurementData(measurement.lastRead, measurement.minRead, measurement.maxRead);
-    }
-
-    // Gestionar el estado del WiFi según la configuración del M4
-    if (data.wifiEnabled && !wifiInitialized) {
-      wifiManager.begin();
-      wifiInitialized = true;
-    } else if (!data.wifiEnabled && wifiInitialized) {
-      wifiManager.stop();
-      wifiInitialized = false;
-    }
-    
-    rpcManager.markSystemDataProcessed();
-  }
-
-  // Ejecutar loop del WiFi Manager si está habilitado
-  if (wifiInitialized) {
-    wifiManager.loop();
-  }
 }
+

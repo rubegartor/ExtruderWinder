@@ -1,4 +1,5 @@
 #include <UI/components/general.h>
+#include <UI/components/settingsTab.h>
 #include "Commons/globals.h"
 
 Arduino_H7_Video Display(800, 480, GigaDisplayShield);
@@ -11,13 +12,18 @@ lv_obj_t *winderInfoPullerSpeedLabel, *winderInfoWeightLabel, *winderInfoWeightL
 lv_obj_t *minSpeedSpinbox, *maxSpeedSpinbox, *diameterSpinbox, *alertWeightSpinbox;
 lv_obj_t *positionBar, *homePositionBtn, *startSpoolCalibrationBtn, *positionBarMinLabel, *positionBarMaxLabel;
 lv_obj_t *moveLeftBtn, *moveRightBtn;
-lv_obj_t *wifiIPLabel;
-
 lv_obj_t *chart, *chartMaxLabel, *chartMinLabel;
 lv_chart_series_t *ser;
 
 static ConfirmationCallback currentConfirmationCallback = nullptr;
 static uint32_t originalTabIndex = 0;
+
+// Límites del positionBar pendientes de aplicar. updateSpoolProgressLimits()
+// puede invocarse desde el motorTask, pero LVGL NO es thread-safe: por eso solo
+// guardamos los valores y el cambio se aplica en update_ui() (hilo principal).
+static volatile bool    spoolLimitsDirty = false;
+static volatile int32_t pendingSpoolMin  = 0;
+static volatile int32_t pendingSpoolMax  = 0;
 
 void setConfirmationCallback(ConfirmationCallback callback, uint32_t originalTab, const char* message) {
   currentConfirmationCallback = callback;
@@ -46,7 +52,7 @@ void update_ui(lv_timer_t *timer) {
   lv_label_set_text_fmt(minMeasureLabel, "%.2f", measurementMinRead);
   lv_label_set_text_fmt(maxMeasureLabel, "%.2f", measurementMaxRead);
 
-  if (!aligner.isHoming()) {
+  if (!aligner.isHoming() && positionBar) {
     lv_bar_set_value(positionBar, aligner.currentPosition(), LV_ANIM_ON);
   }
 
@@ -66,15 +72,17 @@ void update_ui(lv_timer_t *timer) {
     }
   }
 
-  if (wifiIPLabel) {
-    if (rpcManager.hasNewWebServerInfo()) {
-      const WebServerMessage& config = rpcManager.getWebServerInfo();
-      if (strlen(config.wifiIP) > 0) {
-        lv_label_set_text_fmt(wifiIPLabel, "WiFi: %s", config.wifiIP);
-      } else {
-        lv_label_set_text(wifiIPLabel, "WiFi: Desconectado");
-      }
-      rpcManager.markWebServerInfoProcessed();
+  if (g_newMeasurementReady) {
+    g_newMeasurementReady = false;
+    addChartValue(static_cast<int32_t>(measurementLastRead * 100));
+  }
+
+  // Aplicar límites del positionBar solicitados desde otros hilos (motorTask).
+  if (spoolLimitsDirty) {
+    spoolLimitsDirty = false;
+    if (positionBar) {
+      lv_bar_set_range(positionBar, pendingSpoolMin, pendingSpoolMax);
+      lv_bar_set_value(positionBar, pendingSpoolMin, LV_ANIM_OFF);
     }
   }
 }
@@ -99,8 +107,9 @@ void updateChartLimits() {
 }
 
 void updateSpoolProgressLimits(int32_t min, int32_t max) {
-  if (positionBar) {
-    lv_bar_set_range(positionBar, min, max);
-    lv_bar_set_value(positionBar, min, LV_ANIM_OFF);
-  }
+  // Thread-safe: puede llamarse desde el motorTask. No toca LVGL aquí;
+  // update_ui() (hilo principal) aplica el cambio cuando detecta el flag.
+  pendingSpoolMin  = min;
+  pendingSpoolMax  = max;
+  spoolLimitsDirty = true;
 }

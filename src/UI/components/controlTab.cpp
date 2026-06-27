@@ -17,7 +17,7 @@ static void move_left_cb(lv_event_t *event) {
   }
 
   if (code == LV_EVENT_SHORT_CLICKED) {
-    aligner.moveTo(-aligner_to_move);
+    aligner.requestManualMove(-aligner_to_move);
     aligner.canMoveLeft = false;
   }
 }
@@ -34,7 +34,7 @@ static void move_right_cb(lv_event_t *event) {
   }
 
   if (code == LV_EVENT_SHORT_CLICKED) {
-    aligner.moveTo(aligner_to_move);
+    aligner.requestManualMove(aligner_to_move);
     aligner.canMoveRight = false;
   }
 }
@@ -45,7 +45,7 @@ static void home_aligner_cb(lv_event_t *event) {
   lv_obj_set_user_data(tabview, (void*)(uintptr_t)currentTab);
 
   setConfirmationCallback([](uint32_t originalTab) {
-    aligner.resetHome();
+    aligner.requestResetHome();
     lv_tabview_set_act(tabview, originalTab, LV_ANIM_OFF);
   }, currentTab, "Continuar con el reset del HOME?");
 
@@ -58,7 +58,7 @@ static void start_aligner(lv_event_t *event) {
   lv_obj_set_user_data(tabview, (void*)(uintptr_t)currentTab);
 
   setConfirmationCallback([](uint32_t originalTab) {
-    aligner.startSpoolCalibration();
+    aligner.requestStartCalibration();
     lv_tabview_set_act(tabview, originalTab, LV_ANIM_OFF);
   }, currentTab, "Recalibrar la bobina?");
 

@@ -11,10 +11,19 @@
 
 class Tensioner : public TimedComponent {
   public:
-    Tensioner() : TimedComponent() {}
+    static Tensioner& getInstance() {
+      static Tensioner instance;
+      return instance;
+    }
+
+    Tensioner(const Tensioner&)            = delete;
+    Tensioner& operator=(const Tensioner&) = delete;
 
     uint16_t distance;
 
     void setup();
     void execute() override;
+
+  private:
+    Tensioner() : TimedComponent() {}
 };

@@ -41,7 +41,13 @@ public:
   int maxOutput;
   uint16_t speed = MIN_PULLER_SPEED_DEFAULT;
 
-  Puller() : TimedComponent() {}
+  static Puller& getInstance() {
+    static Puller instance;
+    return instance;
+  }
+
+  Puller(const Puller&)            = delete;
+  Puller& operator=(const Puller&) = delete;
 
   void setup();
   void execute() override;
@@ -52,4 +58,7 @@ public:
   
   int32_t getRevolutionCount() { return revolutionCount; }
   void resetRevolutionCount() { revolutionCount = 0; }
+
+private:
+  Puller() : TimedComponent() {}
 };

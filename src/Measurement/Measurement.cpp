@@ -1,5 +1,6 @@
 #include "Measurement/Measurement.h"
 #include "Commons/pins.h"
+#include "Commons/globals.h"
 
 enum class ReadState {
   IDLE,
@@ -176,7 +177,10 @@ void Measurement::execute() {
     }
   }
 
-  rpcManager.sendMeasurementData(this->lastRead, this->minRead, this->maxRead);
+  measurementLastRead = this->lastRead;
+  measurementMinRead  = this->minRead;
+  measurementMaxRead  = this->maxRead;
+  g_newMeasurementReady = true;
 
   spcState = ReadState::IDLE;
 }

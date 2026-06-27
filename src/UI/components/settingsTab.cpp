@@ -7,35 +7,6 @@
 lv_obj_t *alertsPanel;
 lv_obj_t *separatorLine;
 lv_obj_t *alertOptions[ALERT_PANEL_OPTION_NUM];
-lv_obj_t *wifiPanel;
-
-typedef struct {
-  lv_obj_t **panel;
-  lv_obj_t **reference_panel;
-  lv_align_t align;
-  lv_coord_t x_offset;
-  lv_coord_t y_offset;
-} panel_alignment_t;
-
-static panel_alignment_t panel_alignments[] = {
-  {&wifiPanel, &alertsPanel, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 10},
-};
-
-static const int panel_alignments_count = sizeof(panel_alignments) / sizeof(panel_alignment_t);
-
-static void realignAllPanels() {
-  lv_obj_update_layout(alertsPanel);
-  
-  for (int i = 0; i < panel_alignments_count; i++) {
-    panel_alignment_t *alignment = &panel_alignments[i];
-    
-    if (alignment->panel && *(alignment->panel) && alignment->reference_panel && *(alignment->reference_panel)) {
-      lv_obj_align_to(*(alignment->panel), *(alignment->reference_panel), alignment->align, alignment->x_offset, alignment->y_offset);
-    }
-  }
-  
-  lv_obj_update_layout(lv_obj_get_parent(alertsPanel));
-}
 
 static void lv_min_spinbox_increment_event_cb(lv_event_t *event)
 {
@@ -131,17 +102,6 @@ static void alertPanelSwitch_cb(lv_event_t *event) {
       lv_obj_set_size(alertsPanel, lv_obj_get_width(alertsPanel), ALERT_PANEL_OPTION_HEIGHT);
       lv_obj_add_flag(separatorLine, LV_OBJ_FLAG_HIDDEN);
     }
-
-    realignAllPanels();
-  }
-}
-
-static void wifiPanelSwitch_cb(lv_event_t *event) {
-  lv_event_code_t code = lv_event_get_code(event);
-  if (code == LV_EVENT_VALUE_CHANGED) {
-    lv_obj_t *sw = (lv_obj_t *)lv_event_get_target(event);
-
-    updateWifiEnabled(lv_obj_has_state(sw, LV_STATE_CHECKED));
   }
 }
 
@@ -345,32 +305,4 @@ void build_settingsTab(lv_obj_t *parent) {
   lv_obj_add_event_cb(alertWeightSpinboxMinusBtn, lv_weight_spinbox_decrement_event_cb, LV_EVENT_ALL, NULL);
 
   lv_obj_move_foreground(separatorLine);
-
-  wifiPanel = lv_obj_create(settingsParent);
-  lv_obj_set_size(wifiPanel, lv_obj_get_width(alertsPanel), ALERT_PANEL_OPTION_HEIGHT);
-  lv_obj_align_to(wifiPanel, alertsPanel, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 10);
-  lv_obj_set_style_bg_color(wifiPanel, lv_palette_darken(LV_PALETTE_GREY, 2), 0);
-  lv_obj_set_style_border_width(wifiPanel, 0, 0);
-
-  wifiIPLabel = lv_label_create(wifiPanel);
-  lv_obj_set_style_text_color(wifiIPLabel, lv_color_hex(0xFFFFFF), 0);
-  lv_label_set_text(wifiIPLabel, "WiFi: Desconectado");
-  lv_obj_set_style_text_font(wifiIPLabel, &lv_font_montserrat_28, 0);
-  lv_obj_align(wifiIPLabel, LV_ALIGN_LEFT_MID, 10, 0);
-
-  lv_obj_t *wifiPanelSwitch = lv_switch_create(wifiPanel);
-  lv_obj_set_size(wifiPanelSwitch, 90, 50);
-  lv_obj_set_style_pad_all(wifiPanelSwitch, -7, LV_PART_KNOB);
-  lv_obj_align(wifiPanelSwitch, LV_ALIGN_RIGHT_MID, -10, 0);
-
-  lv_obj_set_style_bg_color(wifiPanelSwitch, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_INDICATOR | LV_STATE_CHECKED);
-  lv_obj_set_style_bg_color(wifiPanelSwitch, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-  lv_obj_set_style_bg_color(wifiPanelSwitch, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_INDICATOR | LV_STATE_FOCUSED);
-  lv_obj_set_style_bg_color(wifiPanelSwitch, lv_palette_main(LV_PALETTE_ORANGE), LV_STATE_CHECKED);
-
-  if (wifiEnabled) {
-    lv_obj_add_state(wifiPanelSwitch, LV_STATE_CHECKED);
-  }
-
-  lv_obj_add_event_cb(wifiPanelSwitch, wifiPanelSwitch_cb, LV_EVENT_VALUE_CHANGED, NULL);
 }

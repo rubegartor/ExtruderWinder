@@ -28,8 +28,6 @@ extern lv_obj_t *minSpeedSpinbox, *maxSpeedSpinbox, *diameterSpinbox, *alertWeig
 extern lv_obj_t *positionBar, *homePositionBtn, *startSpoolCalibrationBtn, *positionBarMinLabel, *positionBarMaxLabel;
 extern lv_obj_t *startExtensionLabel, *endExtensionLabel;
 extern lv_obj_t *moveLeftBtn, *moveRightBtn;
-extern lv_obj_t *wifiIPLabel;
-
 extern lv_obj_t *chart, *chartMaxLabel, *chartMinLabel;
 extern lv_chart_series_t *ser;
 

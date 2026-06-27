@@ -56,7 +56,8 @@ void Aligner::setup() {
   motor.driver.enable();
 
   motor.controller.beginRampToZeroVelocity();
-  while (!motor.controller.zeroVelocity());
+  unsigned long zeroVelTimeout = millis() + 5000;
+  while (!motor.controller.zeroVelocity() && millis() < zeroVelTimeout);
   motor.controller.endRampToZeroVelocity();
   motor.controller.zeroActualPosition();
   motor.controller.enableStallStop();
@@ -89,10 +90,42 @@ void Aligner::execute() {
 }
 
 void Aligner::loop() {
+  processPendingActions();
   handleManualMovement();
 
   if (shouldExecute()) {
     execute();
+  }
+}
+
+void Aligner::requestManualMove(int32_t delta) {
+  // Llamado desde el hilo de la UI. Solo escribe flags (sin SPI).
+  pendingManualMoveDelta = delta;
+  pendingManualMove = true;
+}
+
+void Aligner::requestResetHome() {
+  pendingResetHome = true;
+}
+
+void Aligner::requestStartCalibration() {
+  pendingStartCalibration = true;
+}
+
+void Aligner::processPendingActions() {
+  // Se ejecuta dentro del motorTask: aquí es seguro hacer SPI porque ningún
+  // otro hilo toca el bus. Procesa las acciones solicitadas desde la UI.
+  if (pendingResetHome) {
+    pendingResetHome = false;
+    resetHome();
+  }
+  if (pendingStartCalibration) {
+    pendingStartCalibration = false;
+    startSpoolCalibration();
+  }
+  if (pendingManualMove) {
+    pendingManualMove = false;
+    moveTo(pendingManualMoveDelta);
   }
 }
 
@@ -223,7 +256,9 @@ bool Aligner::isHoming() {
 }
 
 int32_t Aligner::currentPosition() {
-  return motor.controller.readActualPosition();
+  // Devuelve la posición cacheada por execute() para evitar transacciones SPI
+  // desde el hilo de la UI (LVGL timer) simultáneas con las del motorTask.
+  return lastKnownPosition;
 }
 
 void Aligner::resetHome(bool afterError) {

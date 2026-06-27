@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include "Commons/TimedComponent.h"
-#include "Commons/RPCManager.h"
 
 #define MITUTOYO_CLK_DEBOUNCE 280
 
@@ -12,7 +11,13 @@
 
 class Measurement : public TimedComponent {    
   public:
-    Measurement(RPCManager& rpcMgr) : TimedComponent(), rpcManager(rpcMgr) {}
+    static Measurement& getInstance() {
+      static Measurement instance;
+      return instance;
+    }
+
+    Measurement(const Measurement&)            = delete;
+    Measurement& operator=(const Measurement&) = delete;
 
     float lastRead = 0.00f;
     float minRead = 0.00f;
@@ -26,6 +31,7 @@ class Measurement : public TimedComponent {
     void execute() override;
 
   private:
-    RPCManager& rpcManager;
+    Measurement() : TimedComponent() {}
+
     bool isFirstDigitError(float newValue, float previousValue);
 };

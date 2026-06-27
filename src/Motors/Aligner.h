@@ -47,22 +47,43 @@ private:
   int32_t lastKnownPosition = 0;
   uint8_t disabledCount = 0;
 
+  // Acciones diferidas desde la UI, ejecutadas en el motorTask (ver processPendingActions).
+  volatile bool    pendingResetHome = false;
+  volatile bool    pendingStartCalibration = false;
+  volatile bool    pendingManualMove = false;
+  volatile int32_t pendingManualMoveDelta = 0;
+
   // Variables para el estado de calibración del spool
   bool startPositionSet = false;
   bool endPositionSet = false;
   
-  // Variables para extensiones de posición
-  int32_t startExtension = 0;  // Extensión hacia la izquierda desde startPos
-  int32_t endExtension = 0;    // Extensión hacia la derecha desde endPos
+  // Variables para extensiones de posición.
+  // volatile: se escriben desde callbacks de la UI y se leen en el motorTask
+  // (getEffectiveStartPos/EndPos durante onSpoolerRevolution).
+  volatile int32_t startExtension = 0;  // Extensión hacia la izquierda desde startPos
+  volatile int32_t endExtension = 0;    // Extensión hacia la derecha desde endPos
 
 public:
-  bool canMoveLeft = false;
-  bool canMoveRight = false;
+  volatile bool canMoveLeft = false;
+  volatile bool canMoveRight = false;
+
+  // Acciones solicitadas desde el hilo de la UI. NO ejecutan SPI directamente:
+  // marcan un flag que el motorTask procesa en processPendingActions(), de modo
+  // que TODO acceso al bus SPI ocurre en un único hilo y nunca colisiona.
+  void requestManualMove(int32_t delta);
+  void requestResetHome();
+  void requestStartCalibration();
 
   int32_t startPos = 0;
   int32_t endPos = MAX_ALIGNER_POSITION;
 
-  Aligner() : TimedComponent() {}
+  static Aligner& getInstance() {
+    static Aligner instance;
+    return instance;
+  }
+
+  Aligner(const Aligner&)            = delete;
+  Aligner& operator=(const Aligner&) = delete;
 
   void setup();
   void execute() override;
@@ -100,6 +121,8 @@ public:
   bool enabled();
 
 private:
+  Aligner() : TimedComponent() {}
+
   void applyParameters(AlignerParameterMode mode);
   void resetPositions();
   void setStartPosition();
@@ -110,4 +133,5 @@ private:
   void handleSpoolCalibration();
   void handleWaiting();
   void handleManualMovement();
+  void processPendingActions();
 };

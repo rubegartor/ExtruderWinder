@@ -31,15 +31,24 @@ private:
   bool enabled();
     
 public:
-  Spooler() : TimedComponent() {}
-
   uint16_t minOutput;
   uint16_t maxOutput;
 
   uint16_t speed;
 
+  static Spooler& getInstance() {
+    static Spooler instance;
+    return instance;
+  }
+
+  Spooler(const Spooler&)            = delete;
+  Spooler& operator=(const Spooler&) = delete;
+
   void setup();
   void execute() override;
 
   int32_t getRevolutionCount() const { return revolutionCount; }
+
+private:
+  Spooler() : TimedComponent() {}
 };
