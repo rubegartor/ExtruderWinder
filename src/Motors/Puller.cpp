@@ -48,7 +48,9 @@ const auto controller_parameters_real = tmc51x0::ControllerParameters{}
   .withMaxAcceleration(1000000u);
 
 
-void Puller::setup() {
+void Puller::setup(unsigned long interval) {
+  setInterval(interval);
+
   this->setupDriver();
   this->setupPID();
 
@@ -60,11 +62,7 @@ void Puller::setupDriver() {
   motor.setupSpi(spi_parameters, tmc51x0::Registers::DeviceModel::TMC5160A);
   motor.converter.setup(converter_parameters);
 
-  tmc51x0::DriverParameters driver_parameters_chip = motor.converter.driverParametersRealToChip(driver_parameters_real);
-  motor.driver.setup(driver_parameters_chip);
-
-  tmc51x0::ControllerParameters controller_parameters_chip = motor.converter.controllerParametersRealToChip(controller_parameters_real);
-  motor.controller.setup(controller_parameters_chip);
+  applyParameters();
 
   motor.driver.enable();
 
@@ -73,11 +71,18 @@ void Puller::setupDriver() {
   while (!motor.controller.zeroVelocity() && millis() < zeroVelTimeout);
   motor.controller.endRampToZeroVelocity();
   motor.controller.zeroActualPosition();
+  // endRampToZeroVelocity() restaura el modo de rampa que LEYÓ del chip: fijar el nuestro.
+  applyParameters();
 
   lastPosition = 0;
   revolutionCount = 0;
 
   motor.controller.writeMaxVelocity(motor.converter.velocityRealToChip(this->speed));
+}
+
+void Puller::applyParameters() {
+  motor.driver.setup(motor.converter.driverParametersRealToChip(driver_parameters_real));
+  motor.controller.setup(motor.converter.controllerParametersRealToChip(controller_parameters_real));
 }
 
 void Puller::setupPID() {
@@ -92,7 +97,9 @@ void Puller::setupPID() {
 }
 
 void Puller::execute() {
-  motor.recoverIfUnhealthy();
+  TmcHealth health = checkTmcHealth(motor, guard, TMC_PULLER);
+  if (health == TmcHealth::Lost) applyParameters();  // el chip se reinició: reescribir toda su config
+  if (health != TmcHealth::Ok) return;
 
   this->input = measurementLastRead;
 
@@ -111,12 +118,12 @@ void Puller::execute() {
   motor.controller.writeMaxVelocity(motor.converter.velocityRealToChip(this->speed));
 
   int32_t currentPosition = motor.controller.readActualPosition();
-  int32_t positionDelta = currentPosition - lastPosition;
+  int32_t positionDelta = (int32_t)((uint32_t)currentPosition - lastPosition);
 
-  // Comprobación de cordura: a 8000 RPM y 80 ms de intervalo, el máximo
-  // avance posible es ~546 000 pasos. Si el delta es negativo o absurdamente
-  // grande, la lectura SPI está corrompida; actualizar lastPosition y descartar.
-  const int32_t MAX_POSITION_DELTA = 1100000;
+  // Comprobación de cordura: al tope de la UI (18000) son 240 000 micropasos/s, unos
+  // 19 200 por ciclo de 80 ms. Un delta negativo o de más de 2 vueltas es una lectura SPI
+  // corrupta (o un reset del chip): resincronizar y descartar. (Antes se admitían 21 vueltas.)
+  const int32_t MAX_POSITION_DELTA = PULLER_ONE_REV_STEPS * 2;
   if (positionDelta < 0 || positionDelta > MAX_POSITION_DELTA) {
     lastPosition = currentPosition;
     return;

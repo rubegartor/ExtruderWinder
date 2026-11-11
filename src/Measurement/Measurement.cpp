@@ -82,7 +82,9 @@ bool Measurement::isFirstDigitError(float newValue, float previousValue) {
   return diff > 1.0f;
 }
 
-void Measurement::setup() {
+void Measurement::setup(unsigned long interval) {
+  setInterval(interval);
+
   memset((void*)spcdata, 0, sizeof(spcdata));
   memset((void*)fullSPCData, 0, sizeof(fullSPCData));
 

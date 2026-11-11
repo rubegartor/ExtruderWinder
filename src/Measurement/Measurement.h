@@ -27,7 +27,7 @@ class Measurement : public TimedComponent {
     uint8_t rejectedReadCount = 0;    // Contador de lecturas rechazadas consecutivas
     unsigned long readingStartTime = 0; // Para timeout del estado READING
 
-    void setup();
+    void setup(unsigned long interval);
     void execute() override;
 
   private:

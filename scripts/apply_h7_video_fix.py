@@ -56,42 +56,50 @@ def process_file(h7_video_file, env_name):
     except:
         return
     
-    # Verificar si el patch ya está aplicado
-    if "w * h * 2" in content and "free(rotated_buf)" in content:
-        print(f"✓ Fix de Arduino_H7_Video ya aplicado en {env_name}")
-        return
-    
-    print(f"→ Aplicando fix de Arduino_H7_Video en {env_name}: {h7_video_file}")
-    
-    # Crear backup
-    backup_file = h7_video_file + ".original"
-    if not os.path.exists(backup_file):
-        shutil.copy2(h7_video_file, backup_file)
-    
-    # Aplicar el fix 1: Cambiar el tamaño del buffer de w * h * 4 a w * h * 2
-    # y agregar verificación de memoria nula
-    pattern1 = r'rotated_buf = \(uint8_t\*\)realloc\(rotated_buf, w \* h \* 4\);'
-    replacement1 = '''uint8_t* new_buf = (uint8_t*)realloc(rotated_buf, w * h * 2);
+    original = content
+
+    if not ("w * h * 2" in content and "free(rotated_buf)" in content):
+        # Aplicar el fix 1: Cambiar el tamaño del buffer de w * h * 4 a w * h * 2
+        # y agregar verificación de memoria nula
+        pattern1 = r'rotated_buf = \(uint8_t\*\)realloc\(rotated_buf, w \* h \* 4\);'
+        replacement1 = '''uint8_t* new_buf = (uint8_t*)realloc(rotated_buf, w * h * 2);
     if (new_buf == NULL) {
       return; // Insufficient memory error
     }
     rotated_buf = new_buf;'''
-    
-    content = re.sub(pattern1, replacement1, content)
-    
-    # Aplicar el fix 2: Agregar liberación del buffer después de dsi_lcdDrawImage
-    # Buscar la línea específica y agregar el código después
-    pattern2 = r'(dsi_lcdDrawImage\([^)]+\)[^;]*;)'
-    replacement2 = r'''\1
-  
+
+        content = re.sub(pattern1, replacement1, content)
+
+        # Aplicar el fix 2: Agregar liberación del buffer después de dsi_lcdDrawImage
+        # Buscar la línea específica y agregar el código después
+        pattern2 = r'(dsi_lcdDrawImage\([^)]+\)[^;]*;)'
+        replacement2 = r'''\1
+
   // free the rotated buffer if it was allocated
   if (rotation != LV_DISPLAY_ROTATION_0) {
     free(rotated_buf);
     rotated_buf = nullptr;
   }'''
-    
-    content = re.sub(pattern2, replacement2, content, flags=re.MULTILINE)
-    
+
+        content = re.sub(pattern2, replacement2, content, flags=re.MULTILINE)
+
+    # Fix 3: si realloc falla hay que avisar igualmente a LVGL. Sin flush_ready,
+    # LVGL espera en bucle infinito a que termine el flush: UI y medición congeladas.
+    if "lv_display_flush_ready(disp);\n      return; // Insufficient memory error" not in content:
+        content = content.replace("      return; // Insufficient memory error",
+                                  "      lv_display_flush_ready(disp);\n      return; // Insufficient memory error", 1)
+
+    if content == original:
+        print(f"✓ Fix de Arduino_H7_Video ya aplicado en {env_name}")
+        return
+
+    print(f"→ Aplicando fix de Arduino_H7_Video en {env_name}: {h7_video_file}")
+
+    # Crear backup
+    backup_file = h7_video_file + ".original"
+    if not os.path.exists(backup_file):
+        shutil.copy2(h7_video_file, backup_file)
+
     # Escribir el archivo modificado
     try:
         with open(h7_video_file, 'w', encoding='utf-8') as f:

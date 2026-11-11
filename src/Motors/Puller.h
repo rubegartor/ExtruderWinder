@@ -3,6 +3,7 @@
 #include <TMC51X0.hpp>
 #include "Commons/TimedComponent.h"
 #include <QuickPID.h>
+#include "Stepper.h"
 
 #define PULLER_DIAM 24.5f  // In mm
 
@@ -25,8 +26,9 @@ private:
 
   QuickPID pid;
   
-  int32_t lastPosition;
+  uint32_t lastPosition;  // unsigned: XACTUAL desborda y la resta modular sigue siendo correcta
   int32_t revolutionCount;
+  TmcGuard guard;
 
   float setPoint, input, output;
   float aggKp = 5, aggKi = 25, aggKd = 0.05;
@@ -35,6 +37,7 @@ private:
 
   void setupPID();
   void setupDriver();
+  void applyParameters();
     
 public:
   int minOutput;
@@ -49,7 +52,7 @@ public:
   Puller(const Puller&)            = delete;
   Puller& operator=(const Puller&) = delete;
 
-  void setup();
+  void setup(unsigned long interval);
   void execute() override;
 
   void updateSetPoint(float value);

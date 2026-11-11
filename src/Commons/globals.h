@@ -12,14 +12,16 @@
 
 #define DIAMETER_PREF "diameter"
 #define DIAMETER_DEFAULT 1.75f
+#define DIAMETER_MIN 0.50f
+#define DIAMETER_MAX 3.00f
 
-inline Tensioner&   tensioner   = Tensioner::getInstance();
-inline Puller&      puller      = Puller::getInstance();
-inline Aligner&     aligner     = Aligner::getInstance();
-inline Spooler&     spooler     = Spooler::getInstance();
-inline Measurement& measurement = Measurement::getInstance();
-inline Storage&     storage     = Storage::getInstance();
-inline Buzzer&      buzzer      = Buzzer::getInstance();
+extern Tensioner&   tensioner;
+extern Puller&      puller;
+extern Aligner&     aligner;
+extern Spooler&     spooler;
+extern Measurement& measurement;
+extern Storage&     storage;
+extern Buzzer&      buzzer;
 
 #define PLASTIC_TYPE_PREF "plasticType"
 #define PLASTIC_TYPE_DEFAULT 0 // PLA
@@ -33,6 +35,7 @@ inline Buzzer&      buzzer      = Buzzer::getInstance();
 
 // Flag para notificar al hilo principal que hay un nuevo valor de medición para el gráfico
 extern volatile bool g_newMeasurementReady;
+
 
 extern float diameter;
 extern bool  alertsEnabled;
@@ -63,6 +66,7 @@ void updateFilamentAlertThreshold(float value);
 void updatePlasticType(uint8_t index);
 
 void resetMeasurements();
+void resetMinMax();
 
 float getExtrudedFilamentLength();
 float getExtrudedFilamentWeight();

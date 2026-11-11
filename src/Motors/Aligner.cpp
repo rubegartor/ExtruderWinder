@@ -47,7 +47,9 @@ tmc51x0::ControllerParameters getControllerParameters(AlignerParameterMode mode)
     .withStallStopEnabled(true);
 }
 
-void Aligner::setup() {
+void Aligner::setup(unsigned long interval) {
+  setInterval(interval);
+
   motor.setupSpi(spi_parameters, tmc51x0::Registers::DeviceModel::TMC5160A);
   motor.converter.setup(converter_parameters);
 
@@ -60,31 +62,25 @@ void Aligner::setup() {
   while (!motor.controller.zeroVelocity() && millis() < zeroVelTimeout);
   motor.controller.endRampToZeroVelocity();
   motor.controller.zeroActualPosition();
-  motor.controller.enableStallStop();
+  // endRampToZeroVelocity() restaura el modo de rampa que LEYÓ del chip: fijar el nuestro
+  // (incluye el stop por stall para el homing).
+  applyParameters(AlignerParameterMode::NORMAL_OPERATION);
 }
 
 void Aligner::execute() {
-  tmc51x0::HealthStatus health = motor.readHealthStatus();
-
-  if (health.reset || health.mirror_resync_required) {
-    // El chip se reinició: XACTUAL vuelve a 0, la referencia espacial se pierde.
-    // reinit() restaura la configuración del driver y lanza re-homing automático,
-    // preservando la calibración del spool (startPos/endPos).
-    reinit();
-    return;
-  }
-
-  if (!health.communication_ok || health.driver_error || health.charge_pump_undervoltage) {
-    // Otro error de hardware sin reset de posición: restaurar solo la configuración.
-    motor.notePossibleMirrorDrift();
-    motor.recoverIfNeeded();
+  switch (checkTmcHealth(motor, guard, TMC_ALIGNER)) {
+    case TmcHealth::Glitch:
+      return;
+    case TmcHealth::Lost:
+      // El chip se reinició: XACTUAL vuelve a 0, la referencia espacial se pierde.
+      // reinit() lanza re-homing automático preservando la calibración (startPos/endPos).
+      reinit();
+      return;
+    case TmcHealth::Ok:
+      break;
   }
 
   handleStateMachine();
-
-  if (!this->enabled()) {
-    this->reinit();
-  }
 
   lastKnownPosition = motor.controller.readActualPosition();
 }
@@ -149,34 +145,44 @@ void Aligner::handleStateMachine() {
   }
 }
 
+// El homing y la calibración fijan el origen y los límites con estos dos flags: se exigen
+// dos lecturas seguidas iguales para que un bit corrupto no deje el origen a mitad de recorrido.
+bool Aligner::stalled() {
+  return motor.driver.stalled() && motor.driver.stalled();
+}
+
+bool Aligner::positionReached() {
+  return motor.controller.positionReached() && motor.controller.positionReached();
+}
+
 void Aligner::handleHoming() {
-  if (motor.driver.stalled()) {
+  if (stalled()) {
     motor.controller.disableStallStop();
     resetPositions();
     waitFor(100, AlignerState::MOVING_TO_HOME);
   } else {
-    motor.controller.writeTargetPosition(MAX_ALIGNER_POSITION * 2);
+    writeTarget(MAX_ALIGNER_POSITION * 2);
   }
 }
 
 void Aligner::handleMovingToHome() {
-  motor.controller.writeTargetPosition(-MAX_ALIGNER_POSITION);
-  
-  if (motor.controller.positionReached()) {
+  writeTarget(-MAX_ALIGNER_POSITION);
+
+  if (positionReached()) {
     if (!homingAfterError) {
       resetPositions();
-      motor.controller.writeTargetPosition(MAX_ALIGNER_POSITION / 2);
+      writeTarget(MAX_ALIGNER_POSITION / 2);
       currentState = AlignerState::IDLE;
     } else {
       resetPositions();
-      motor.controller.writeTargetPosition(getEffectiveStartPos());
+      writeTarget(getEffectiveStartPos());
       currentState = AlignerState::AUTO_MOVE;
     }
   }
 }
 
 void Aligner::handleSpoolCalibration() {
-  if (motor.driver.stalled()) {
+  if (stalled()) {
     motor.controller.disableStallStop();
     
     if (!startPositionSet) {
@@ -189,7 +195,7 @@ void Aligner::handleSpoolCalibration() {
     if (startPositionSet && !endPositionSet) {
       motor.controller.enableStallStop();
     }
-    if (startPositionSet && endPositionSet && motor.controller.positionReached()) {
+    if (startPositionSet && endPositionSet && positionReached()) {
       currentState = AlignerState::AUTO_MOVE;
       motor.controller.disableStallStop();
     }
@@ -214,10 +220,28 @@ void Aligner::handleManualMovement() {
 }
 
 void Aligner::moveTo(int32_t position) {
-  int32_t current_position = motor.controller.readTargetPosition();
-  int32_t to_go = current_position + position;
+  int32_t to_go = targetPosition + position;
   int32_t clampedPosition = max(getEffectiveStartPos(), min(to_go, getEffectiveEndPos()));
-  motor.controller.writeTargetPosition(clampedPosition);
+  writeTarget(clampedPosition);
+}
+
+void Aligner::writeTarget(int32_t position) {
+  // XTARGET se guarda en RAM en vez de releerlo por SPI: una lectura corrupta
+  // en onSpoolerRevolution()/moveTo() mandaba el carro de golpe a un extremo.
+  targetPosition = position;
+  motor.controller.writeTargetPosition(position);
+}
+
+int32_t Aligner::readStoppedPosition() {
+  // Motor parado (tras stall): dos lecturas seguidas deben coincidir. Evita fijar
+  // un límite de calibración con una lectura SPI corrupta.
+  int32_t a = motor.controller.readActualPosition();
+  for (uint8_t i = 0; i < 3; i++) {
+    int32_t b = motor.controller.readActualPosition();
+    if (a == b) break;
+    a = b;
+  }
+  return a;
 }
 
 void Aligner::onSpoolerRevolution() {
@@ -228,7 +252,7 @@ void Aligner::onSpoolerRevolution() {
   // Escalado con redondeo al entero más cercano para evitar sesgos por truncado
   float scaled = step * 1.35f;
   int32_t stepScaled = static_cast<int32_t>(scaled + (scaled >= 0.0f ? 0.5f : -0.5f));
-  int32_t nextPosition = motor.controller.readTargetPosition() + stepScaled;
+  int32_t nextPosition = targetPosition + stepScaled;
 
   int32_t effectiveEndPos = getEffectiveEndPos();
   int32_t effectiveStartPos = getEffectiveStartPos();
@@ -244,7 +268,7 @@ void Aligner::onSpoolerRevolution() {
   }
   
   // Escribir posición saturada dentro de [start, end]
-  motor.controller.writeTargetPosition(max(effectiveStartPos, min(nextPosition, effectiveEndPos)));
+  writeTarget(max(effectiveStartPos, min(nextPosition, effectiveEndPos)));
 }
 
 bool Aligner::isSpoolCalibrated() {
@@ -276,7 +300,7 @@ void Aligner::resetHome(bool afterError) {
   updateSpoolProgressLimits(getEffectiveStartPos(), getEffectiveEndPos());
   resetPositions();
 
-  motor.controller.writeTargetPosition(MAX_ALIGNER_POSITION);
+  writeTarget(MAX_ALIGNER_POSITION);
   motor.controller.enableStallStop();
   currentState = AlignerState::HOMING;
 }
@@ -284,7 +308,7 @@ void Aligner::resetHome(bool afterError) {
 void Aligner::startSpoolCalibration() {
   applyParameters(AlignerParameterMode::CALIBRATION);
   motor.controller.enableStallStop();
-  motor.controller.writeTargetPosition(-MAX_ALIGNER_POSITION * 2);
+  writeTarget(-MAX_ALIGNER_POSITION * 2);
   currentState = AlignerState::SPOOL_CALIBRATION;
 }
 
@@ -302,22 +326,22 @@ void Aligner::applyParameters(AlignerParameterMode mode) {
 
 void Aligner::resetPositions() {
   motor.controller.zeroActualPosition();
-  motor.controller.zeroTargetPosition();
+  writeTarget(0);
 }
 
 void Aligner::setStartPosition() {
-  startPos = motor.controller.readActualPosition();
+  startPos = readStoppedPosition();
   startPositionSet = true;
 
-  motor.controller.writeTargetPosition(MAX_ALIGNER_POSITION * 2);
+  writeTarget(MAX_ALIGNER_POSITION * 2);
 }
 
 void Aligner::setEndPosition() {
-  endPos = motor.controller.readActualPosition();
-  motor.controller.writeTargetPosition(endPos);
+  endPos = readStoppedPosition();
+  writeTarget(endPos);
   endPositionSet = true;
   applyParameters(AlignerParameterMode::NORMAL_OPERATION);
-  motor.controller.writeTargetPosition(startPos);
+  writeTarget(startPos);
   updateSpoolProgressLimits(getEffectiveStartPos(), getEffectiveEndPos());
 }
 
@@ -371,31 +395,8 @@ int32_t Aligner::getEffectiveEndPos() {
 } 
 
 void Aligner::reinit() {
-  // No llamar a SPI1.end()/begin(): mataría la comunicación del Puller y Spooler también.
-  // Solo reinicializar este driver TMC manteniendo el bus SPI activo.
-  motor.reinitialize();
-  delay(10);
-
+  // El chip se reinició y está con sus valores de reset: reescribir toda la config
+  // (parámetros normales, por si se estaba calibrando) y re-homing.
   applyParameters(AlignerParameterMode::NORMAL_OPERATION);
-  motor.driver.enable();
-
-  disabledCount = 0;
   resetHome(true);
-}
-
-bool Aligner::enabled() {
-  using namespace tmc51x0;
-
-  tmc51x0::Registers::Chopconf chopConf;
-  chopConf.raw = motor.registers.read(Registers::ChopconfAddress);
-
-  if (chopConf.toff() != 0) {
-    disabledCount = 0;
-    return true;
-  }
-
-  // Requerir fallos consecutivos antes de considerar el driver deshabilitado.
-  // Un solo fallo SPI por ruido no debe lanzar un reinit completo en producción.
-  disabledCount++;
-  return disabledCount < ENABLED_FAIL_THRESHOLD;
 }

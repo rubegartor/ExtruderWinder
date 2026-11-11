@@ -2,14 +2,11 @@
 
 #include <TMC51X0.hpp>
 #include "Commons/TimedComponent.h"
+#include "Stepper.h"
 
 #define STEPS_PER_CM 52350
 #define MAX_ALIGNER_POSITION (STEPS_PER_CM * 13)
 #define MANUAL_MOVE_DELAY 25
-
-// Número de fallos consecutivos de lectura SPI antes de considerar el driver deshabilitado.
-// Evita reinicializaciones en producción por glitches puntuales de ruido en el bus.
-#define ENABLED_FAIL_THRESHOLD 3
 
 enum AlignerDirection {
   FORWARD,
@@ -45,7 +42,8 @@ private:
 
   bool homingAfterError = false;
   int32_t lastKnownPosition = 0;
-  uint8_t disabledCount = 0;
+  int32_t targetPosition = 0;   // Copia en RAM de XTARGET (ver writeTarget)
+  TmcGuard guard;
 
   // Acciones diferidas desde la UI, ejecutadas en el motorTask (ver processPendingActions).
   volatile bool    pendingResetHome = false;
@@ -85,7 +83,7 @@ public:
   Aligner(const Aligner&)            = delete;
   Aligner& operator=(const Aligner&) = delete;
 
-  void setup();
+  void setup(unsigned long interval);
   void execute() override;
   void loop() override;
 
@@ -117,10 +115,8 @@ public:
   
   void waitFor(unsigned long durationMs, AlignerState nextState);
 
-  void reinit();
-  bool enabled();
-
 private:
+  void reinit();
   Aligner() : TimedComponent() {}
 
   void applyParameters(AlignerParameterMode mode);
@@ -134,4 +130,8 @@ private:
   void handleWaiting();
   void handleManualMovement();
   void processPendingActions();
+  void writeTarget(int32_t position);
+  int32_t readStoppedPosition();
+  bool stalled();
+  bool positionReached();
 };

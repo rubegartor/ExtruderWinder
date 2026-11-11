@@ -8,6 +8,8 @@
 #define TENSIONER_SETPOINT 140
 #define TENSIONER_MAX_DISTANCE 300
 #define TENSIONER_START_THRESHOLD 170
+// Ecos perdidos seguidos (x100 ms) antes de dar el sensor por caído y parar el spooler.
+#define TENSIONER_MAX_MISSED_ECHOES 20
 
 class Tensioner : public TimedComponent {
   public:
@@ -20,8 +22,9 @@ class Tensioner : public TimedComponent {
     Tensioner& operator=(const Tensioner&) = delete;
 
     uint16_t distance;
+    uint8_t  missedEchoes = 0;
 
-    void setup();
+    void setup(unsigned long interval);
     void execute() override;
 
   private:

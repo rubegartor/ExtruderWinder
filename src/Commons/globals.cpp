@@ -3,6 +3,14 @@
 #include "pins.h"
 
 
+Tensioner&   tensioner   = Tensioner::getInstance();
+Puller&      puller      = Puller::getInstance();
+Aligner&     aligner     = Aligner::getInstance();
+Spooler&     spooler     = Spooler::getInstance();
+Measurement& measurement = Measurement::getInstance();
+Storage&     storage     = Storage::getInstance();
+Buzzer&      buzzer      = Buzzer::getInstance();
+
 volatile bool g_newMeasurementReady = false;
 
 float diameter = DIAMETER_DEFAULT;
@@ -49,6 +57,12 @@ void initGlobals() {
   selectedPlasticTypeIndex = storage.getInt(PLASTIC_TYPE_PREF,  PLASTIC_TYPE_DEFAULT);
   alertsEnabled          = storage.getBool(ALERT_ENABLED_PREF,  ALERT_ENABLED_DEFAULT);
   weightAlertThreshold   = storage.getInt(WEIGHT_ALERT_PREF,    WEIGHT_ALERT_DEFAULT);
+
+  // Valores de flash corruptos: un índice fuera de rango leía basura de plasticTypes
+  // (puntero a String inválido -> HardFault al construir la UI, bucle de arranque)
+  // y un diámetro 0 deja aligner_to_move = 0 (divisiones por cero, aligner parado).
+  if (selectedPlasticTypeIndex >= plasticTypes.size()) selectedPlasticTypeIndex = PLASTIC_TYPE_DEFAULT;
+  if (!(diameter >= DIAMETER_MIN && diameter <= DIAMETER_MAX)) diameter = DIAMETER_DEFAULT;
 
   aligner_to_move = static_cast<int32_t>(STEPS_PER_CM * (diameter / 10.0f));
 
@@ -107,6 +121,13 @@ float getExtrudedFilamentWeight() {
   }
 
   return weight;
+}
+
+// Solo reinicia mín./máx. del calibre (p. ej. tras enhebrar), sin tocar longitud ni peso
+void resetMinMax() {
+  measurement.minRead = measurement.maxRead = measurement.lastRead;
+  measurementMinRead  = measurement.lastRead;
+  measurementMaxRead  = measurement.lastRead;
 }
 
 void resetMeasurements() {

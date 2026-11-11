@@ -149,7 +149,7 @@ void build_homeTab(lv_obj_t *parent) {
 
   diameterSpinbox = lv_spinbox_create(winderFilamentParent);
   lv_spinbox_set_step(diameterSpinbox, 0);
-  lv_spinbox_set_range(diameterSpinbox, 0, 300);
+  lv_spinbox_set_range(diameterSpinbox, DIAMETER_MIN * 100, DIAMETER_MAX * 100);
   lv_spinbox_set_digit_format(diameterSpinbox, 3, 1);
   lv_spinbox_step_prev(diameterSpinbox);
   lv_obj_set_width(diameterSpinbox, 100);
